@@ -1,4 +1,5 @@
 <?php
+// Save as: app/Http/Controllers/PreviousBalanceController.php
 
 namespace App\Http\Controllers;
 
@@ -91,7 +92,13 @@ class PreviousBalanceController extends Controller
     /*
     |--------------------------------------------------------------------------
     | Carry Forward — add previous balance as a new voucher line
-    | This creates a "Previous Balance" voucher for the current month
+    | This creates a "Previous Balance" voucher for the current month.
+    |
+    | The old, overdue vouchers that make up that balance are now closed
+    | out via markAsCarriedForwardTo(): status -> 'carried_forward' (C.F),
+    | balance_amount -> 0, notes gets the new voucher number appended, and
+    | a link back to the new voucher is stored — so nothing is counted
+    | twice in the ledger, dashboard, or defaulter reports.
     |--------------------------------------------------------------------------
     */
 
@@ -113,6 +120,8 @@ class PreviousBalanceController extends Controller
         $overdueVouchers = FeeVoucher::where('student_id', $studentId)
             ->outstanding()
             ->where('due_date', '<', $cutoffDate)
+            ->orderByDesc('due_date')
+            ->orderByDesc('id')
             ->get();
 
         if ($overdueVouchers->isEmpty()) {
@@ -130,6 +139,7 @@ class PreviousBalanceController extends Controller
         }
 
         $totalBalance = $overdueVouchers->sum('balance_amount');
+        $latestSource = $overdueVouchers->first(); // ordered latest due_date first, above
 
         /*
         |----------------------------------------------------------------------
@@ -138,39 +148,52 @@ class PreviousBalanceController extends Controller
         |----------------------------------------------------------------------
         */
 
-        DB::transaction(function () use ($studentId, $cutoffDate, $totalBalance, $overdueVouchers) {
+        DB::transaction(function () use ($studentId, $cutoffDate, $totalBalance, $overdueVouchers, $latestSource) {
             $feeType = FeeType::firstOrCreate(
                 ['name' => 'Previous Balance'],
                 ['category' => 'other', 'is_active' => 1, 'description' => 'Auto carry-forward of previous balance']
             );
 
             $voucher = FeeVoucher::create([
-                'voucher_no'     => 'CF-' . date('YmdHis') . '-' . $studentId,
-                'student_id'     => $studentId,
-                'voucher_type'   => 'manual',
-                'period_from'    => $cutoffDate,
-                'period_to'      => Carbon::now()->endOfMonth()->toDateString(),
-                'total_amount'   => $totalBalance,
-                'discount'       => 0,
-                'payable_amount' => $totalBalance,
-                'paid_amount'    => 0,
-                'balance_amount' => $totalBalance,
-                'due_date'       => Carbon::now()->endOfMonth()->toDateString(),
-                'status'         => 'unpaid',
-                'notes'          => 'Previous Balance carry-forward (' . $overdueVouchers->count() . ' voucher(s))',
+                'voucher_no'                  => 'CF-' . date('YmdHis') . '-' . $studentId,
+                'student_id'                  => $studentId,
+                'voucher_type'                => 'manual',
+                'period_from'                 => $cutoffDate,
+                'period_to'                   => Carbon::now()->endOfMonth()->toDateString(),
+                'total_amount'                => $totalBalance,
+                'discount'                    => 0,
+                'payable_amount'               => $totalBalance,
+                'paid_amount'                  => 0,
+                'balance_amount'               => $totalBalance,
+                'due_date'                     => Carbon::now()->endOfMonth()->toDateString(),
+                'status'                       => 'unpaid',
+                'notes'                        => 'Previous Balance carry-forward (' . $overdueVouchers->count() . ' voucher(s))',
+                'previous_balance_voucher_id'  => $latestSource?->id,
             ]);
+
+            $refLabel = $latestSource
+                ? ' (Ref: ' . $latestSource->voucher_no
+                    . ($overdueVouchers->count() > 1 ? ' +' . ($overdueVouchers->count() - 1) . ' more' : '')
+                    . ')'
+                : '';
 
             FeeVoucherItem::create([
                 'voucher_id'   => $voucher->id,
                 'fee_type_id'  => $feeType->id,
-                'description'  => 'Previous Balance carry-forward',
+                'description'  => 'Previous Balance carry-forward' . $refLabel,
                 'month'        => $cutoffDate,
                 'months_count' => 1,
                 'amount'       => $totalBalance,
             ]);
+
+            // Close out every source voucher so it stops showing as
+            // separately outstanding.
+            foreach ($overdueVouchers as $sourceVoucher) {
+                $sourceVoucher->markAsCarriedForwardTo($voucher);
+            }
         });
 
-        return back()->with('success', "Previous balance of Rs. " . number_format($totalBalance, 0) . " carried forward successfully.");
+        return back()->with('success', "Previous balance of Rs. " . number_format($totalBalance, 0) . " carried forward successfully. Source voucher(s) marked Carried Forward.");
     }
 
     /*
@@ -212,14 +235,20 @@ class PreviousBalanceController extends Controller
                     continue;
                 }
 
-                $totalBalance = FeeVoucher::where('student_id', $studentId)
+                $overdueVouchers = FeeVoucher::where('student_id', $studentId)
                     ->outstanding()
                     ->where('due_date', '<', $cutoffDate)
-                    ->sum('balance_amount');
+                    ->orderByDesc('due_date')
+                    ->orderByDesc('id')
+                    ->get();
+
+                $totalBalance = $overdueVouchers->sum('balance_amount');
 
                 if ($totalBalance <= 0) {
                     continue;
                 }
+
+                $latestSource = $overdueVouchers->first();
 
                 $feeType = FeeType::firstOrCreate(
                     ['name' => 'Previous Balance'],
@@ -227,29 +256,40 @@ class PreviousBalanceController extends Controller
                 );
 
                 $voucher = FeeVoucher::create([
-                    'voucher_no'     => 'CF-' . date('Ymd') . '-' . $studentId,
-                    'student_id'     => $studentId,
-                    'voucher_type'   => 'manual',
-                    'period_from'    => $cutoffDate,
-                    'period_to'      => Carbon::now()->endOfMonth()->toDateString(),
-                    'total_amount'   => $totalBalance,
-                    'discount'       => 0,
-                    'payable_amount' => $totalBalance,
-                    'paid_amount'    => 0,
-                    'balance_amount' => $totalBalance,
-                    'due_date'       => Carbon::now()->endOfMonth()->toDateString(),
-                    'status'         => 'unpaid',
-                    'notes'          => 'Previous Balance carry-forward (bulk)',
+                    'voucher_no'                  => 'CF-' . date('Ymd') . '-' . $studentId,
+                    'student_id'                  => $studentId,
+                    'voucher_type'                => 'manual',
+                    'period_from'                 => $cutoffDate,
+                    'period_to'                   => Carbon::now()->endOfMonth()->toDateString(),
+                    'total_amount'                => $totalBalance,
+                    'discount'                    => 0,
+                    'payable_amount'               => $totalBalance,
+                    'paid_amount'                  => 0,
+                    'balance_amount'               => $totalBalance,
+                    'due_date'                     => Carbon::now()->endOfMonth()->toDateString(),
+                    'status'                       => 'unpaid',
+                    'notes'                        => 'Previous Balance carry-forward (bulk)',
+                    'previous_balance_voucher_id'  => $latestSource?->id,
                 ]);
+
+                $refLabel = $latestSource
+                    ? ' (Ref: ' . $latestSource->voucher_no
+                        . ($overdueVouchers->count() > 1 ? ' +' . ($overdueVouchers->count() - 1) . ' more' : '')
+                        . ')'
+                    : '';
 
                 FeeVoucherItem::create([
                     'voucher_id'   => $voucher->id,
                     'fee_type_id'  => $feeType->id,
-                    'description'  => 'Previous Balance carry-forward',
+                    'description'  => 'Previous Balance carry-forward (bulk)' . $refLabel,
                     'month'        => $cutoffDate,
                     'months_count' => 1,
                     'amount'       => $totalBalance,
                 ]);
+
+                foreach ($overdueVouchers as $sourceVoucher) {
+                    $sourceVoucher->markAsCarriedForwardTo($voucher);
+                }
 
                 $processed++;
             }

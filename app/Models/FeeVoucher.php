@@ -1,4 +1,5 @@
 <?php
+// Save as: app/Models/FeeVoucher.php
 
 namespace App\Models;
 
@@ -22,6 +23,9 @@ class FeeVoucher extends Model
         'due_date',
         'status',
         'notes',
+        // Carry-forward linking (added for previous-balance workflow)
+        'carried_forward_to_voucher_id',
+        'previous_balance_voucher_id',
     ];
 
     protected $casts = [
@@ -59,6 +63,34 @@ class FeeVoucher extends Model
         return $this->hasMany(FeePayment::class, 'voucher_id');
     }
 
+    /**
+     * On an OLD voucher: the NEW voucher that absorbed its balance
+     * (set once this voucher has been carried forward).
+     */
+    public function carriedForwardTo()
+    {
+        return $this->belongsTo(FeeVoucher::class, 'carried_forward_to_voucher_id');
+    }
+
+    /**
+     * On a NEW voucher: every OLD voucher that was closed out and
+     * rolled into this one.
+     */
+    public function carriedForwardFrom()
+    {
+        return $this->hasMany(FeeVoucher::class, 'carried_forward_to_voucher_id');
+    }
+
+    /**
+     * On a NEW voucher: the single (latest, if several contributed)
+     * OLD voucher its "Previous outstanding balance (b/f)" line
+     * references — used for display only.
+     */
+    public function previousBalanceVoucher()
+    {
+        return $this->belongsTo(FeeVoucher::class, 'previous_balance_voucher_id');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Scopes
@@ -73,6 +105,11 @@ class FeeVoucher extends Model
     public function scopePartial($query)
     {
         return $query->where('status', 'partial');
+    }
+
+    public function scopeCarriedForward($query)
+    {
+        return $query->where('status', 'carried_forward');
     }
 
     public function scopeOverdue($query)
@@ -115,6 +152,30 @@ class FeeVoucher extends Model
         } else {
             $this->status = 'partial';
         }
+
+        $this->save();
+    }
+
+    /**
+     * Close this voucher out because its remaining balance has been rolled
+     * into $newVoucher (via the Monthly Fee Generator or the Previous
+     * Balance carry-forward screens). Marks status as 'carried_forward',
+     * zeroes the balance so it can never be double-counted in the ledger,
+     * dashboard, or defaulter reports, links back to the new voucher, and
+     * leaves a human-readable trail in notes.
+     *
+     * Deliberately does NOT touch paid_amount — that stays as the true
+     * historical record of what was actually paid against this voucher.
+     */
+    public function markAsCarriedForwardTo(FeeVoucher $newVoucher): void
+    {
+        $this->status                        = 'carried_forward';
+        $this->balance_amount                = 0;
+        $this->carried_forward_to_voucher_id = $newVoucher->id;
+        $this->notes = trim(
+            ($this->notes ? $this->notes . ' | ' : '')
+            . 'Carried forward to voucher ' . $newVoucher->voucher_no . ' on ' . now()->format('Y-m-d')
+        );
 
         $this->save();
     }

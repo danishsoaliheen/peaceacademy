@@ -27,6 +27,12 @@ class FeeMatrixController extends Controller
         $sessionId = $request->session_id ?: optional($sessions->firstWhere('is_active', 1))->id;
         $classId   = $request->class_id;
 
+        // Default to "Active" students when status isn't present in the URL
+        // at all (a fresh visit / sidebar link). Once staff explicitly pick
+        // a status — "All" (status=all) or "Inactive" (status=0) — that
+        // choice is respected instead.
+        $statusFilter = $request->missing('status') ? '1' : $request->status;
+
         // Default window: last 3 months through next 3 months. The old
         // "-1 / +2" window quietly dropped recently-paid vouchers from a
         // couple of months back (e.g. a May payment was invisible by July),
@@ -41,8 +47,17 @@ class FeeMatrixController extends Controller
             ->where('status', 'active')
             ->when($sessionId, fn($q) => $q->where('session_id', $sessionId))
             ->when($classId, fn($q) => $q->where('class_id', $classId))
+            // The enrollment being active doesn't guarantee the student is —
+            // a student can be deactivated without their enrollment record
+            // being flipped too, which is why inactive students were still
+            // showing up here (same root cause as the Monthly Fee Generator).
+            ->when($statusFilter !== 'all', function ($q) use ($statusFilter) {
+                $q->whereHas('student', function ($sq) use ($statusFilter) {
+                    $sq->where('is_active', $statusFilter);
+                });
+            })
             ->get()
-            ->filter(fn($e) => $e->student !== null)
+            ->filter(fn($e) => $e->student !== null && ($statusFilter === 'all' || $e->student->is_active == $statusFilter))
             ->sortBy([
                 fn($e) => $e->class->class_order ?? 999,
                 fn($e) => $e->student->student_name,
@@ -207,7 +222,7 @@ class FeeMatrixController extends Controller
         ];
 
         return view('fee_matrix.index', compact(
-            'sessions', 'classes', 'sessionId', 'classId',
+            'sessions', 'classes', 'sessionId', 'classId', 'statusFilter',
             'fromMonth', 'toMonth', 'months', 'groupedRows', 'stats'
         ));
     }

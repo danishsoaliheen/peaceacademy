@@ -18,6 +18,80 @@ class StudentLedgerController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
+    | Sortable columns whitelist
+    |--------------------------------------------------------------------------
+    |
+    | Maps a safe "sort" key (as seen in the URL) to the actual SQL column
+    | it maps to. Never interpolate $request->sort directly into orderBy() —
+    | always go through this whitelist so an arbitrary column name can't be
+    | injected via the query string.
+    |--------------------------------------------------------------------------
+    */
+
+    private const SORTABLE_COLUMNS = [
+        'name'         => 'students.student_name',
+        'admission_no' => 'students.admission_no',
+        'father_name'  => 'students.father_name',
+        'class'        => 'class_sort_order',
+        'outstanding'  => 'outstanding_balance',
+    ];
+
+    // Sensible default direction the first time a column is sorted by
+    // (e.g. biggest dues first makes more sense than smallest-first).
+    private const SORT_DEFAULT_DIRECTIONS = [
+        'name'         => 'asc',
+        'admission_no' => 'asc',
+        'father_name'  => 'asc',
+        'class'        => 'asc',
+        'outstanding'  => 'desc',
+    ];
+
+    /**
+     * Validate sort/direction from the request against the whitelist,
+     * falling back to safe defaults for anything unrecognised.
+     */
+    private function resolveSort(Request $request): array
+    {
+        $sort = $request->string('sort')->toString();
+        if (!array_key_exists($sort, self::SORTABLE_COLUMNS)) {
+            $sort = 'name';
+        }
+
+        $direction = strtolower($request->string('direction')->toString());
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            $direction = self::SORT_DEFAULT_DIRECTIONS[$sort];
+        }
+
+        return [$sort, $direction];
+    }
+
+    /**
+     * Apply the whitelisted sort to a query, with student name as a
+     * stable tiebreaker so rows with equal values don't jump around
+     * between page loads.
+     */
+    private function applySort($studentsQuery, string $sort, string $direction)
+    {
+        $column = self::SORTABLE_COLUMNS[$sort];
+
+        if ($sort === 'class') {
+            // Students with no active enrollment (class_sort_order is NULL)
+            // are always pushed to the end, regardless of direction.
+            $studentsQuery->orderByRaw("$column IS NULL")
+                          ->orderBy($column, $direction);
+        } else {
+            $studentsQuery->orderBy($column, $direction);
+        }
+
+        if ($sort !== 'name') {
+            $studentsQuery->orderBy('students.student_name', 'asc');
+        }
+
+        return $studentsQuery;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Shared filtered query (used by both index() and exportBalanceSheet())
     |--------------------------------------------------------------------------
     |
@@ -37,9 +111,17 @@ class StudentLedgerController extends Controller
         $outstandingOnly = $request->boolean('outstanding_only');
         $today           = Carbon::now()->toDateString();
 
+        // Default to "Active" when status isn't present in the URL at all
+        // (a fresh visit / sidebar link). Once the user explicitly picks a
+        // status — including "All" (status=all) or "Inactive" (status=0) —
+        // that choice is respected instead.
+        $statusFilter = $request->missing('status') ? '1' : $request->status;
+
         $studentsQuery = Student::query()
             ->with(['activeEnrollment.class'])
-            ->where('students.is_active', 1)
+            ->when($statusFilter !== null && $statusFilter !== '' && $statusFilter !== 'all', function ($q) use ($statusFilter) {
+                $q->where('students.is_active', $statusFilter);
+            })
             ->select('students.*')
             ->selectSub(function ($q) {
                 $q->from('fee_vouchers')
@@ -63,6 +145,24 @@ class StudentLedgerController extends Controller
                   ->orderByDesc('fv_last.created_at')
                   ->limit(1);
             }, 'last_voucher_id')
+            ->selectSub(function ($q) {
+                // Natural class order (Nursery, KG, Class 1, Class 2 …)
+                // rather than alphabetical, taken from the student's
+                // currently active enrollment.
+                //
+                // Table names are pulled from the models themselves
+                // (rather than hardcoded) so this doesn't break if the
+                // underlying table names differ from what's assumed here.
+                $enrollmentTable = (new PaEnrollment())->getTable();
+                $classTable      = (new PaClass())->getTable();
+
+                $q->from($enrollmentTable)
+                  ->join($classTable, "$classTable.id", '=', "$enrollmentTable.class_id")
+                  ->select("$classTable.class_order")
+                  ->whereColumn("$enrollmentTable.student_id", 'students.id')
+                  ->where("$enrollmentTable.is_active", 1)
+                  ->limit(1);
+            }, 'class_sort_order')
             ->when($query, function ($q) use ($query) {
                 $q->where('students.student_name', 'like', "%{$query}%");
             })
@@ -109,7 +209,8 @@ class StudentLedgerController extends Controller
         $query           = $request->search;
         $classFilter     = $request->class_id;
         $outstandingOnly = $request->boolean('outstanding_only');
-        $sort            = $request->sort ?? 'name';
+        $statusFilter    = $request->missing('status') ? '1' : $request->status;
+        [$sort, $direction] = $this->resolveSort($request);
 
         $studentsQuery = $this->filteredStudentsQuery($request);
 
@@ -127,11 +228,7 @@ class StudentLedgerController extends Controller
         $studentsWithDues     = $allMatched->where('outstanding_balance', '>', 0)->count();
         $studentsOverdue      = $allMatched->where('overdue_count', '>', 0)->count();
 
-        if ($sort === 'outstanding') {
-            $studentsQuery->orderByDesc('outstanding_balance');
-        } else {
-            $studentsQuery->orderBy('students.student_name');
-        }
+        $this->applySort($studentsQuery, $sort, $direction);
 
         $students = $studentsQuery->paginate(25)->withQueryString();
 
@@ -151,7 +248,9 @@ class StudentLedgerController extends Controller
             'classes',
             'classFilter',
             'outstandingOnly',
+            'statusFilter',
             'sort',
+            'direction',
             'totalStudentsMatched',
             'totalOutstandingAll',
             'studentsWithDues',
@@ -172,15 +271,11 @@ class StudentLedgerController extends Controller
 
     public function exportBalanceSheet(Request $request)
     {
-        $sort = $request->sort ?? 'name';
+        [$sort, $direction] = $this->resolveSort($request);
 
         $studentsQuery = $this->filteredStudentsQuery($request);
 
-        if ($sort === 'outstanding') {
-            $studentsQuery->orderByDesc('outstanding_balance');
-        } else {
-            $studentsQuery->orderBy('students.student_name');
-        }
+        $this->applySort($studentsQuery, $sort, $direction);
 
         $students = $studentsQuery->get();
 
@@ -414,20 +509,24 @@ class StudentLedgerController extends Controller
 
         $studentId = $request->student_id;
 
-        $cutoff = Carbon::now()->startOfMonth()->toDateString();
-
+        // No due-date cutoff here on purpose: this endpoint feeds the manual
+        // "Create Voucher" screen, which has no reference billing month like
+        // the Monthly Fee Generator does. Any unpaid/partial voucher counts
+        // as "previous balance" the moment staff are creating a NEW voucher
+        // for this student — including one due later this month — otherwise
+        // the panel silently never appears for a student whose only open
+        // voucher happens to be due this month.
         $balance = FeeVoucher::where('student_id', $studentId)
             ->outstanding()
-            ->where('due_date', '<', $cutoff)
             ->sum('balance_amount');
 
         // Also return breakdown of overdue vouchers for detail display
         $overdueVouchers = FeeVoucher::where('student_id', $studentId)
             ->outstanding()
-            ->where('due_date', '<', $cutoff)
             ->orderBy('due_date')
             ->get(['id', 'voucher_no', 'due_date', 'payable_amount', 'paid_amount', 'balance_amount', 'status'])
             ->map(fn($v) => [
+                'id'              => $v->id,
                 'voucher_no'      => $v->voucher_no,
                 'due_date'        => Carbon::parse($v->due_date)->format('M Y'),
                 'payable_amount'  => $v->payable_amount,
@@ -439,7 +538,6 @@ class StudentLedgerController extends Controller
         return response()->json([
             'previous_balance'  => $balance,
             'overdue_vouchers'  => $overdueVouchers,
-            'cutoff_date'       => $cutoff,
             'count'             => $overdueVouchers->count(),
         ]);
     }

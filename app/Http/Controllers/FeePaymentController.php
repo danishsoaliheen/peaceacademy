@@ -1,4 +1,5 @@
 <?php
+// Save as: app/Http/Controllers/FeePaymentController.php
 
 namespace App\Http\Controllers;
 
@@ -144,9 +145,12 @@ class FeePaymentController extends Controller
 
         $paymentMethods = PaymentMethodHelper::enabled();
 
-        // If the voucher is fully paid, only allow correcting payment method/reference/notes.
-        // Amount and date are locked to avoid breaking the voucher balance.
-        $methodOnlyMode = $payment->voucher->status === 'paid';
+        // If the voucher is fully paid OR has been carried forward (closed
+        // out into a new voucher), only allow correcting payment
+        // method/reference/notes. Amount and date are locked so we never
+        // trigger recalculateBalance() into resetting balance_amount away
+        // from 0 on a voucher that's supposed to be closed.
+        $methodOnlyMode = in_array($payment->voucher->status, ['paid', 'carried_forward'], true);
 
         return view('fee_payments.edit', compact('payment', 'paymentMethods', 'methodOnlyMode'));
     }
@@ -162,13 +166,17 @@ class FeePaymentController extends Controller
         $payment = FeePayment::findOrFail($id);
         $voucher = FeeVoucher::findOrFail($payment->voucher_id);
 
-        $methodOnlyMode = $voucher->status === 'paid';
+        // Same guard as edit(): paid or carried-forward vouchers are closed,
+        // so amount/date stay locked and only the payment method/reference/
+        // notes may be corrected.
+        $methodOnlyMode = in_array($voucher->status, ['paid', 'carried_forward'], true);
 
         if ($methodOnlyMode) {
             /*
             |------------------------------------------------------------------
-            | Paid voucher — only payment method, reference & notes may change.
-            | Amount and date are untouched so balance stays correct.
+            | Paid / carried-forward voucher — only payment method, reference
+            | & notes may change. Amount and date are untouched so balance
+            | stays correct (and, for carried-forward vouchers, stays at 0).
             |------------------------------------------------------------------
             */
             $request->validate([

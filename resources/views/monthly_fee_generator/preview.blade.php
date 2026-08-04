@@ -1,3 +1,4 @@
+{{-- Save as: resources/views/monthly_fee_generator/preview.blade.php --}}
 @extends('layouts.dashboard')
 
 @section('content')
@@ -73,6 +74,8 @@
         <i class="fas fa-info-circle me-1"></i>
         Previous balance will be added for <strong>{{ $studentsWithPB }}</strong> student(s),
         totalling <strong>Rs {{ number_format($totalPrevBal) }}</strong>.
+        Their source voucher(s) will be marked <strong>Carried Forward (C.F)</strong> and zeroed out
+        once you confirm below.
     </div>
 @endif
 
@@ -111,7 +114,14 @@
                         <td>{{ $row['discount'] > 0 ? '- Rs '.number_format($row['discount']) : '—' }}</td>
                         @if($include_previous_balance)
                             <td class="{{ $row['previous_balance'] > 0 ? 'text-danger fw-bold' : 'text-muted' }}">
-                                {{ $row['previous_balance'] > 0 ? '+ Rs '.number_format($row['previous_balance']) : '—' }}
+                                @if($row['previous_balance'] > 0)
+                                    + Rs {{ number_format($row['previous_balance']) }}
+                                    <div class="text-muted" style="font-size:.72rem; font-weight:normal;">
+                                        From: {{ $row['previous_balance_vouchers']->pluck('voucher_no')->implode(', ') }}
+                                    </div>
+                                @else
+                                    —
+                                @endif
                             </td>
                         @endif
                         <td class="fw-bold">Rs {{ number_format($row['payable']) }}</td>

@@ -1,4 +1,5 @@
 <?php
+// Save as: app/Http/Controllers/MonthlyFeeGeneratorController.php
 
 namespace App\Http\Controllers;
 
@@ -30,7 +31,8 @@ class MonthlyFeeGeneratorController extends Controller
     | without writing anything to the database. Lets Danish see, per
     | student, the fee amount, whether a voucher already exists for this
     | month (will be skipped), and — if requested — the previous balance
-    | that will be added on top. Confirms on the next screen via store().
+    | that will be added on top, including exactly which old voucher(s)
+    | it's coming from. Confirms on the next screen via store().
     |--------------------------------------------------------------------------
     */
 
@@ -184,6 +186,18 @@ class MonthlyFeeGeneratorController extends Controller
                 | Previous Balance — added as an EXTRA line item on the same
                 | voucher (mirrors the manual "Create Voucher" screen), then
                 | rolled into the voucher's total/payable/balance amounts.
+                |
+                | Every OLD voucher that contributed to this sum is then
+                | closed out via markAsCarriedForwardTo():
+                |   - status -> 'carried_forward' (shows as C.F in the UI)
+                |   - balance_amount -> 0 (so it can never be double-counted
+                |     in the ledger, dashboard, or defaulter reports again)
+                |   - notes gets the new voucher number appended
+                |   - carried_forward_to_voucher_id links to the new voucher
+                |
+                | The NEW voucher's previous_balance_voucher_id references
+                | the single LATEST source voucher (by due_date) for display,
+                | even when several old vouchers were rolled in together.
                 |------------------------------------------------------------
                 */
                 if ($request->include_previous_balance && $row['previous_balance'] > 0) {
@@ -193,10 +207,20 @@ class MonthlyFeeGeneratorController extends Controller
                         ['category' => 'other', 'is_active' => 1, 'description' => 'Previous outstanding balance']
                     );
 
+                    /** @var \Illuminate\Support\Collection $sourceVouchers */
+                    $sourceVouchers = $row['previous_balance_vouchers'];
+                    $latestSource   = $sourceVouchers->first(); // ordered latest due_date first, see buildRows()
+
+                    $refLabel = $latestSource
+                        ? ' (Ref: ' . $latestSource->voucher_no
+                            . ($sourceVouchers->count() > 1 ? ' +' . ($sourceVouchers->count() - 1) . ' more' : '')
+                            . ')'
+                        : '';
+
                     FeeVoucherItem::create([
                         'voucher_id'   => $voucher->id,
                         'fee_type_id'  => $prevBalanceFeeType->id,
-                        'description'  => 'Previous outstanding balance (b/f)',
+                        'description'  => 'Previous outstanding balance (b/f)' . $refLabel,
                         'month'        => $periodFrom,
                         'months_count' => 1,
                         'amount'       => $row['previous_balance'],
@@ -205,10 +229,17 @@ class MonthlyFeeGeneratorController extends Controller
                     $newTotal = $voucher->payable_amount + $row['previous_balance'];
 
                     $voucher->update([
-                        'total_amount'   => $voucher->total_amount + $row['previous_balance'],
-                        'payable_amount' => $newTotal,
-                        'balance_amount' => $newTotal,
+                        'total_amount'                => $voucher->total_amount + $row['previous_balance'],
+                        'payable_amount'               => $newTotal,
+                        'balance_amount'               => $newTotal,
+                        'previous_balance_voucher_id'  => $latestSource?->id,
                     ]);
+
+                    // Close out every contributing voucher so its balance
+                    // stops showing as separately outstanding.
+                    foreach ($sourceVouchers as $sourceVoucher) {
+                        $sourceVoucher->markAsCarriedForwardTo($voucher);
+                    }
 
                     $studentsWithPrevBalance++;
                     $totalPrevBalanceAdded += $row['previous_balance'];
@@ -226,7 +257,7 @@ class MonthlyFeeGeneratorController extends Controller
 
         if ($studentsWithPrevBalance > 0) {
             $message .= " Previous balance included for {$studentsWithPrevBalance} student(s), totalling Rs. "
-                . number_format($totalPrevBalanceAdded, 0) . ".";
+                . number_format($totalPrevBalanceAdded, 0) . ". Their old voucher(s) were marked Carried Forward.";
         }
 
         return redirect()
@@ -251,8 +282,15 @@ class MonthlyFeeGeneratorController extends Controller
             ->where('session_id', $request->session_id)
             ->where('is_active', 1)
             ->where('status', 'active')
+            // The enrollment being active doesn't guarantee the student is —
+            // a student can be deactivated (e.g. left/withdrawn) without
+            // their old enrollment record being flipped too. Filter on both,
+            // otherwise inactive students still get picked up and billed.
+            ->whereHas('student', function ($q) {
+                $q->where('is_active', 1);
+            })
             ->get()
-            ->filter(fn ($e) => $e->student !== null)
+            ->filter(fn ($e) => $e->student !== null && $e->student->is_active == 1)
             ->sortBy(fn ($e) => $e->student->student_name);
 
         // Only recurring monthly fee-type rows belong in a monthly voucher.
@@ -286,28 +324,33 @@ class MonthlyFeeGeneratorController extends Controller
 
             /*
             |------------------------------------------------------------------
-            | Previous balance = sum of balance_amount across every
-            | outstanding (unpaid/partial, balance > 0) voucher for this
-            | student that was due BEFORE the month being generated.
-            | This mirrors the "Previous Balances" report/screen so the two
-            | stay in agreement.
+            | Previous balance — fetches the ACTUAL source voucher records
+            | (not just a sum), ordered latest-due-date-first. This mirrors
+            | the "Previous Balances" report/screen so the two stay in
+            | agreement, and lets store() reference + close out the exact
+            | vouchers the balance came from.
             |------------------------------------------------------------------
             */
-            $previousBalance = $request->include_previous_balance
-                ? (float) FeeVoucher::where('student_id', $student->id)
+            $previousBalanceVouchers = $request->include_previous_balance
+                ? FeeVoucher::where('student_id', $student->id)
                     ->outstanding()
                     ->where('due_date', '<', $periodFrom)
-                    ->sum('balance_amount')
-                : 0;
+                    ->orderByDesc('due_date')
+                    ->orderByDesc('id')
+                    ->get()
+                : collect();
+
+            $previousBalance = (float) $previousBalanceVouchers->sum('balance_amount');
 
             return [
-                'enrollment'       => $enrollment,
-                'already_exists'   => $alreadyExists,
-                'fee_structure'    => $feeStructure,
-                'fee_amount'       => $feeAmount,
-                'discount'         => $enrollment->discount_amount ?? 0,
-                'previous_balance' => $previousBalance,
-                'payable'          => max(0, $feeAmount - ($enrollment->discount_amount ?? 0)) + $previousBalance,
+                'enrollment'                => $enrollment,
+                'already_exists'            => $alreadyExists,
+                'fee_structure'             => $feeStructure,
+                'fee_amount'                => $feeAmount,
+                'discount'                  => $enrollment->discount_amount ?? 0,
+                'previous_balance'          => $previousBalance,
+                'previous_balance_vouchers' => $previousBalanceVouchers,
+                'payable'                   => max(0, $feeAmount - ($enrollment->discount_amount ?? 0)) + $previousBalance,
             ];
         })->values();
     }

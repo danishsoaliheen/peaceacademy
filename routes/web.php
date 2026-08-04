@@ -68,7 +68,7 @@ Route::middleware(['auth.custom'])->group(function () {
     Route::get('/students/import',         [StudentImportController::class, 'showImportForm'])->name('students.import');
     Route::post('/students/import/process',[StudentImportController::class, 'import'])        ->name('students.import.process');
     Route::get('/students/import/sample',  [StudentImportController::class, 'downloadSample'])->name('students.import.sample');
-
+    Route::get('/students/export',         [StudentController::class, 'export'])              ->name('students.export');
     // Serves student photos directly from storage — does not depend on the
     // public/storage symlink, so it keeps working even if `storage:link`
     // was never run or fails (common on Windows without admin rights).

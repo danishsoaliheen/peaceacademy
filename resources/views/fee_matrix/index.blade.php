@@ -80,6 +80,15 @@
                 </div>
 
                 <div class="col-md-2">
+                    <label class="form-label small mb-1">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="1" {{ (string)$statusFilter === '1' ? 'selected' : '' }}>Active</option>
+                        <option value="0" {{ (string)$statusFilter === '0' ? 'selected' : '' }}>Inactive</option>
+                        <option value="all" {{ (string)$statusFilter === 'all' ? 'selected' : '' }}>All</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
                     <label class="form-label small mb-1">From Month</label>
                     <input type="month" name="from_month" class="form-control form-control-sm" value="{{ $fromMonth }}">
                 </div>
@@ -180,28 +189,48 @@
                             <td>
                                 @if(!$row['admission'])
                                     <span class="fm-cell fm-none">N/A</span>
-                                @elseif($row['admission']['state'] === 'paid')
-                                    <a href="{{ route('fee-vouchers.print', $row['admission']['voucher_id']) }}"
-                                       target="_blank" class="fm-cell fm-paid" style="text-decoration:none; display:inline-block;">
-                                        {{ number_format($row['admission']['paid_amount']) }}
-                                        @if($row['admission']['paid_date'])
-                                            <span class="fm-cell-date">{{ \Carbon\Carbon::parse($row['admission']['paid_date'])->format('d-M-y') }}</span>
-                                        @endif
-                                    </a>
-                                @elseif($row['admission']['state'] === 'partial')
-                                    <a href="{{ route('fee-vouchers.print', $row['admission']['voucher_id']) }}"
-                                       target="_blank" class="fm-cell fm-partial" style="text-decoration:none; display:inline-block;">
-                                        {{ number_format($row['admission']['paid_amount']) }} / {{ number_format($row['admission']['amount']) }}
-                                        @if($row['admission']['paid_date'])
-                                            <span class="fm-cell-date">{{ \Carbon\Carbon::parse($row['admission']['paid_date'])->format('d-M-y') }}</span>
-                                        @endif
-                                    </a>
                                 @else
-                                    <a href="{{ route('fee-vouchers.print', $row['admission']['voucher_id']) }}"
-                                       target="_blank" class="fm-cell fm-unpaid" style="text-decoration:none; display:inline-block;">
-                                        Unpaid
-                                        <span class="fm-cell-date">Rs {{ number_format($row['admission']['amount']) }}</span>
-                                    </a>
+                                    @php
+                                        // A student can have more than one admission/annual
+                                        // voucher — in that case voucher_id is null on
+                                        // purpose (see FeeMatrixController), so link to the
+                                        // student's profile instead of crashing on a
+                                        // missing route parameter.
+                                        $admHref = $row['admission']['voucher_id']
+                                            ? route('fee-vouchers.print', $row['admission']['voucher_id'])
+                                            : route('students.show', $row['student']->id);
+                                        $admMulti = $row['admission']['voucher_count'] > 1;
+                                    @endphp
+                                    @if($row['admission']['state'] === 'paid')
+                                        <a href="{{ $admHref }}" target="_blank" class="fm-cell fm-paid"
+                                           style="text-decoration:none; display:inline-block;"
+                                           title="{{ $admMulti ? $row['admission']['voucher_count'].' vouchers — view student profile' : '' }}">
+                                            {{ number_format($row['admission']['paid_amount']) }}
+                                            @if($admMulti)
+                                                <span class="fm-cell-date">{{ $row['admission']['voucher_count'] }} vouchers</span>
+                                            @elseif($row['admission']['paid_date'])
+                                                <span class="fm-cell-date">{{ \Carbon\Carbon::parse($row['admission']['paid_date'])->format('d-M-y') }}</span>
+                                            @endif
+                                        </a>
+                                    @elseif($row['admission']['state'] === 'partial')
+                                        <a href="{{ $admHref }}" target="_blank" class="fm-cell fm-partial"
+                                           style="text-decoration:none; display:inline-block;"
+                                           title="{{ $admMulti ? $row['admission']['voucher_count'].' vouchers — view student profile' : '' }}">
+                                            {{ number_format($row['admission']['paid_amount']) }} / {{ number_format($row['admission']['amount']) }}
+                                            @if($admMulti)
+                                                <span class="fm-cell-date">{{ $row['admission']['voucher_count'] }} vouchers</span>
+                                            @elseif($row['admission']['paid_date'])
+                                                <span class="fm-cell-date">{{ \Carbon\Carbon::parse($row['admission']['paid_date'])->format('d-M-y') }}</span>
+                                            @endif
+                                        </a>
+                                    @else
+                                        <a href="{{ $admHref }}" target="_blank" class="fm-cell fm-unpaid"
+                                           style="text-decoration:none; display:inline-block;"
+                                           title="{{ $admMulti ? $row['admission']['voucher_count'].' vouchers — view student profile' : '' }}">
+                                            Unpaid
+                                            <span class="fm-cell-date">Rs {{ number_format($row['admission']['amount']) }}{{ $admMulti ? ' ('.$row['admission']['voucher_count'].')' : '' }}</span>
+                                        </a>
+                                    @endif
                                 @endif
                             </td>
 

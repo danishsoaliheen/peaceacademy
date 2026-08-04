@@ -1,6 +1,18 @@
+{{-- Save as: resources/views/monthly_fee_generator/create.blade.php --}}
 @extends('layouts.dashboard')
 
 @section('content')
+
+@php
+    // Default the checkbox to CHECKED on a fresh page load. Only fall back
+    // to the submitted old() value when this is a redisplay after a
+    // validation error (session()->hasOldInput()) — otherwise an unchecked
+    // checkbox (which submits nothing) would be indistinguishable from a
+    // first visit and the box could never default to checked.
+    $includePrevBalanceDefault = session()->hasOldInput()
+        ? old('include_previous_balance', false)
+        : true;
+@endphp
 
 {{-- ── Hero ─────────────────────────────────────────────────────────────── --}}
 <div class="page-hero">
@@ -96,13 +108,16 @@
                             <div class="form-check p-3" style="background:#f8fafc; border-radius:8px;">
                                 <input type="checkbox" name="include_previous_balance" value="1"
                                        class="form-check-input" id="prevBalCheck"
-                                       {{ old('include_previous_balance') ? 'checked' : '' }}>
+                                       {{ $includePrevBalanceDefault ? 'checked' : '' }}>
                                 <label class="form-check-label fw-bold" for="prevBalCheck" style="font-size:.86rem;">
                                     Include previous outstanding balance
                                 </label>
                                 <div class="text-muted small mt-1">
                                     Adds each student's unpaid balance from earlier, overdue vouchers as an extra
                                     line on this month's voucher — so the voucher shows one combined payable amount.
+                                    The old voucher(s) it came from are automatically marked
+                                    <strong>Carried Forward (C.F)</strong> and their balance is zeroed, so nothing
+                                    gets counted twice.
                                 </div>
                             </div>
                         </div>
@@ -135,7 +150,8 @@
                         <li>Looks up the class's <strong>Fee Structure</strong> (sum of all its fee-type amounts). If none is set, it falls back to the student's individual <code>monthly_fee</code> on their enrollment record.</li>
                         <li><strong>Skips</strong> any student who already has a monthly voucher for that exact month — running the generator twice never creates duplicates.</li>
                         <li>Subtracts each student's <strong>per-enrollment discount</strong> to get the payable amount.</li>
-                        <li>If "Include previous balance" is checked, adds up the <code>balance_amount</code> of every one of that student's <strong>unpaid/partial vouchers due before this month</strong>, and appends it as one extra line — <em>"Previous outstanding balance (b/f)"</em> — on the same voucher.</li>
+                        <li>If "Include previous balance" is checked (on by default), adds up the <code>balance_amount</code> of every one of that student's <strong>unpaid/partial vouchers due before this month</strong>, and appends it as one extra line — <em>"Previous outstanding balance (b/f)"</em> — referencing the latest source voucher's number.</li>
+                        <li>Every old voucher that contributed to that balance is then marked <strong>Carried Forward (C.F)</strong> and its balance set to zero, so it stops appearing as separately outstanding anywhere in the system.</li>
                     </ol>
                     <div class="alert alert-info mb-0" style="font-size:.78rem; padding:10px 14px;">
                         <i class="fas fa-lightbulb me-1"></i>

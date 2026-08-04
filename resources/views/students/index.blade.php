@@ -2,6 +2,29 @@
 
 @section('content')
 
+@php
+    function sort_link($column, $sort, $direction)
+    {
+        return request()->fullUrlWithQuery([
+            'sort' => $column,
+            'direction' => ($sort === $column && $direction === 'asc') ? 'desc' : 'asc'
+        ]);
+    }
+
+    function sort_icon($column, $sort, $direction)
+    {
+        if ($sort !== $column) {
+            return '<i class="fas fa-sort text-secondary ms-1"></i>';
+        }
+
+        return $direction === 'asc'
+            ? '<i class="fas fa-sort-up text-warning ms-1"></i>'
+            : '<i class="fas fa-sort-down text-warning ms-1"></i>';
+    }
+@endphp
+
+
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
@@ -174,6 +197,15 @@
                 <a href="{{ route('students.create') }}" class="btn btn-sm btn-warning" style="border-radius:8px; font-weight:600; color:#1e293b;">
                     <i class="fas fa-plus me-1"></i> New Admission
                 </a>
+
+<a href="{{ route('students.export', request()->query()) }}"
+   class="btn btn-success btn-sm">
+    <i class="fas fa-file-excel"></i>
+    Export Excel
+</a>
+
+
+
             </div>
 
         </div>
@@ -289,20 +321,59 @@
     <div class="table-responsive">
         <table class="table tbl mb-0">
 
-            <thead>
-                <tr>
-                    <th width="42">#</th>
-                    <th width="52">Photo</th>
-                    <th>Admission No</th>
-                    <th>Student</th>
-                    <th>Class</th>
-                    <th>Session</th>
-                    <th>Contact</th>
-                    <th width="70">Status</th>
-                    <th width="160">Actions</th>
-                </tr>
-            </thead>
+            <<thead>
+<tr>
 
+    <th width="42">#</th>
+
+    <th width="52">Photo</th>
+
+    <th>
+        <a href="{{ sort_link('admission_no',$sort,$direction) }}"
+           class="text-white text-decoration-none">
+            Admission No
+            {!! sort_icon('admission_no',$sort,$direction) !!}
+        </a>
+    </th>
+
+    <th>
+        <a href="{{ sort_link('name',$sort,$direction) }}"
+           class="text-white text-decoration-none">
+            Student
+            {!! sort_icon('name',$sort,$direction) !!}
+        </a>
+    </th>
+
+    <th>
+        <a href="{{ sort_link('class',$sort,$direction) }}"
+           class="text-white text-decoration-none">
+            Class
+            {!! sort_icon('class',$sort,$direction) !!}
+        </a>
+    </th>
+
+    <th>
+        <a href="{{ sort_link('session',$sort,$direction) }}"
+           class="text-white text-decoration-none">
+            Session
+            {!! sort_icon('session',$sort,$direction) !!}
+        </a>
+    </th>
+
+    <th>Contact</th>
+
+    <th width="70">
+        <a href="{{ sort_link('status',$sort,$direction) }}"
+           class="text-white text-decoration-none">
+            Status
+            {!! sort_icon('status',$sort,$direction) !!}
+        </a>
+    </th>
+
+    <th width="160">Actions</th>
+
+</tr>
+</thead>
             <tbody>
                 @forelse($students as $index => $student)
                     @php $enrollment = $student->enrollments->last(); @endphp

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\Student;
 use App\Models\PaEnrollment;
 use App\Models\PaClass;
@@ -10,8 +13,87 @@ use App\Models\FeeVoucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
+
 class StudentController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Sortable columns whitelist
+    |--------------------------------------------------------------------------
+    |
+    | Maps a safe "sort" key (as seen in the URL) to the actual SQL column
+    | it maps to. Never interpolate $request->sort directly into orderBy() —
+    | always go through this whitelist so an arbitrary column name can't be
+    | injected via the query string.
+    |--------------------------------------------------------------------------
+    */
+
+    private const SORTABLE_COLUMNS = [
+        'admission_no' => 'students.admission_no',
+        'name'         => 'students.student_name',
+        'class'        => 'class_sort_order',
+        'session'      => 'session_sort_name',
+        'status'       => 'students.is_active',
+    ];
+
+    // Sensible default direction the first time a column is clicked.
+    private const SORT_DEFAULT_DIRECTIONS = [
+        'admission_no' => 'desc', // newest admission number first
+        'name'         => 'asc',
+        'class'        => 'asc',
+        'session'      => 'asc',
+        'status'       => 'desc', // active students first
+    ];
+
+    /**
+     * Validate sort/direction from the request against the whitelist.
+     * An empty/invalid sort falls back to '' (no explicit column sort),
+     * which index() treats as "use the original newest-first default".
+     */
+    private function resolveSort(Request $request): array
+    {
+        $sort = $request->string('sort')->toString();
+        if ($sort !== '' && !array_key_exists($sort, self::SORTABLE_COLUMNS)) {
+            $sort = '';
+        }
+
+        $direction = strtolower($request->string('direction')->toString());
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            $direction = $sort !== '' ? self::SORT_DEFAULT_DIRECTIONS[$sort] : 'desc';
+        }
+
+        return [$sort, $direction];
+    }
+
+    /**
+     * Apply the whitelisted sort to the query. With no explicit column
+     * chosen, preserves the page's original default ordering (newest
+     * admissions first) rather than changing existing behaviour.
+     */
+    private function applySort($studentsQuery, string $sort, string $direction)
+    {
+        if ($sort === '') {
+            return $studentsQuery->latest();
+        }
+
+        $column = self::SORTABLE_COLUMNS[$sort];
+
+        if (in_array($sort, ['class', 'session'], true)) {
+            // Students without a matching active enrollment sort to the
+            // end, regardless of direction.
+            $studentsQuery->orderByRaw("$column IS NULL")
+                          ->orderBy($column, $direction);
+        } else {
+            $studentsQuery->orderBy($column, $direction);
+        }
+
+        if ($sort !== 'name') {
+            $studentsQuery->orderBy('students.student_name', 'asc');
+        }
+
+        return $studentsQuery;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | LIST
@@ -23,20 +105,57 @@ class StudentController extends Controller
         $search = $request->search;
         $classFilter = $request->class_id;
         $sessionFilter = $request->session_id;
-        $statusFilter = $request->status;
+        // Default to "Active" when the status filter isn't present in the
+        // URL at all (a fresh visit / sidebar link) — but respect an
+        // explicit choice, including status=all (empty string) or status=0
+        // (inactive), once the user has actually picked one from the
+        // dropdown. request()->missing() checks for the KEY being absent,
+        // which is different from it being present-but-empty.
+        $statusFilter = $request->missing('status') ? '1' : $request->status;
         $familyCodeFilter = $request->family_code;
+        [$sort, $direction] = $this->resolveSort($request);
 
-        $students = Student::with([
+        $studentsQuery = Student::with([
                 'enrollments.class',
                 'enrollments.session',
             ])
+            ->select('students.*')
+            ->selectSub(function ($q) {
+                // Natural class order (Nursery, KG, Class 1, Class 2 …)
+                // rather than alphabetical, taken from the student's
+                // currently active enrollment.
+                //
+                // Table names are pulled from the models themselves
+                // (rather than hardcoded) so this doesn't break if the
+                // underlying table names differ from what's assumed here.
+                $enrollmentTable = (new PaEnrollment())->getTable();
+                $classTable      = (new PaClass())->getTable();
+
+                $q->from($enrollmentTable)
+                  ->join($classTable, "$classTable.id", '=', "$enrollmentTable.class_id")
+                  ->select("$classTable.class_order")
+                  ->whereColumn("$enrollmentTable.student_id", 'students.id')
+                  ->where("$enrollmentTable.is_active", 1)
+                  ->limit(1);
+            }, 'class_sort_order')
+            ->selectSub(function ($q) {
+                $enrollmentTable = (new PaEnrollment())->getTable();
+                $sessionTable    = (new PaSession())->getTable();
+
+                $q->from($enrollmentTable)
+                  ->join($sessionTable, "$sessionTable.id", '=', "$enrollmentTable.session_id")
+                  ->select("$sessionTable.session_name")
+                  ->whereColumn("$enrollmentTable.student_id", 'students.id')
+                  ->where("$enrollmentTable.is_active", 1)
+                  ->limit(1);
+            }, 'session_sort_name')
             ->when($search, function ($q) use ($search) {
                 $q->where('student_name', 'like', "%{$search}%")
                   ->orWhere('admission_no', 'like', "%{$search}%")
                   ->orWhere('father_name', 'like', "%{$search}%")
                   ->orWhere('mobile_no', 'like', "%{$search}%");
             })
-            ->when($statusFilter !== null && $statusFilter !== '', function ($q) use ($statusFilter) {
+            ->when($statusFilter !== null && $statusFilter !== '' && $statusFilter !== 'all', function ($q) use ($statusFilter) {
                 $q->where('is_active', $statusFilter);
             })
             ->when($classFilter, function ($q) use ($classFilter) {
@@ -51,8 +170,11 @@ class StudentController extends Controller
             })
             ->when($familyCodeFilter, function ($q) use ($familyCodeFilter) {
                 $q->where('family_code', $familyCodeFilter);
-            })
-            ->latest()
+            });
+
+        $this->applySort($studentsQuery, $sort, $direction);
+
+        $students = $studentsQuery
             ->paginate(25)
             ->withQueryString();
 
@@ -73,15 +195,150 @@ class StudentController extends Controller
             'classes',
             'sessions',
             'familyCodeFilter',
-            'familyOutstanding'
+            'familyOutstanding',
+            'statusFilter',
+            'sort',
+            'direction'
         ));
     }
+/*
+|--------------------------------------------------------------------------
+| EXPORT TO EXCEL
+|--------------------------------------------------------------------------
+*/
+public function export(Request $request)
+{
+    $search = $request->search;
+    $classFilter = $request->class_id;
+    $sessionFilter = $request->session_id;
+    // Same default as index(): Active-only unless a status was explicitly chosen.
+    $statusFilter = $request->missing('status') ? '1' : $request->status;
+    $familyCodeFilter = $request->family_code;
+
+    [$sort, $direction] = $this->resolveSort($request);
+
+    $studentsQuery = Student::with([
+        'enrollments.class',
+        'enrollments.session',
+    ])
+    ->select('students.*')
+    ->selectSub(function ($q) {
+        $enrollmentTable = (new PaEnrollment())->getTable();
+        $classTable = (new PaClass())->getTable();
+
+        $q->from($enrollmentTable)
+            ->join($classTable, "$classTable.id", '=', "$enrollmentTable.class_id")
+            ->select("$classTable.class_order")
+            ->whereColumn("$enrollmentTable.student_id", 'students.id')
+            ->where("$enrollmentTable.is_active", 1)
+            ->limit(1);
+    }, 'class_sort_order')
+    ->selectSub(function ($q) {
+        $enrollmentTable = (new PaEnrollment())->getTable();
+        $sessionTable = (new PaSession())->getTable();
+
+        $q->from($enrollmentTable)
+            ->join($sessionTable, "$sessionTable.id", '=', "$enrollmentTable.session_id")
+            ->select("$sessionTable.session_name")
+            ->whereColumn("$enrollmentTable.student_id", 'students.id')
+            ->where("$enrollmentTable.is_active", 1)
+            ->limit(1);
+    }, 'session_sort_name')
+    ->when($search, function ($q) use ($search) {
+        $q->where('student_name', 'like', "%{$search}%")
+            ->orWhere('admission_no', 'like', "%{$search}%")
+            ->orWhere('father_name', 'like', "%{$search}%")
+            ->orWhere('mobile_no', 'like', "%{$search}%");
+    })
+    ->when($statusFilter !== null && $statusFilter !== '' && $statusFilter !== 'all', function ($q) use ($statusFilter) {
+        $q->where('is_active', $statusFilter);
+    })
+    ->when($classFilter, function ($q) use ($classFilter) {
+        $q->whereHas('enrollments', function ($eq) use ($classFilter) {
+            $eq->where('class_id', $classFilter)
+               ->where('is_active', 1);
+        });
+    })
+    ->when($sessionFilter, function ($q) use ($sessionFilter) {
+        $q->whereHas('enrollments', function ($eq) use ($sessionFilter) {
+            $eq->where('session_id', $sessionFilter)
+               ->where('is_active', 1);
+        });
+    })
+    ->when($familyCodeFilter, function ($q) use ($familyCodeFilter) {
+        $q->where('family_code', $familyCodeFilter);
+    });
+
+    $this->applySort($studentsQuery, $sort, $direction);
+
+    $students = $studentsQuery->get();
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+
+    $headers = [
+        'Admission No',
+        'Student Name',
+        'Father Name',
+        'Mother Name',
+        'Class',
+        'Session',
+        'Gender',
+        'Mobile',
+        'WhatsApp',
+        'Family Code',
+        'Status'
+    ];
+
+    foreach ($headers as $col => $header) {
+        $sheet->setCellValueByColumnAndRow($col + 1, 1, $header);
+    }
+
+    $row = 2;
+
+    foreach ($students as $student) {
+
+        $enrollment = $student->enrollments->last();
+
+        $sheet->setCellValue('A'.$row, $student->admission_no);
+        $sheet->setCellValue('B'.$row, $student->student_name);
+        $sheet->setCellValue('C'.$row, $student->father_name);
+        $sheet->setCellValue('D'.$row, $student->mother_name);
+        $sheet->setCellValue('E'.$row, optional($enrollment?->class)->class_name);
+        $sheet->setCellValue('F'.$row, optional($enrollment?->session)->session_name);
+        $sheet->setCellValue('G'.$row, $student->gender);
+        $sheet->setCellValue('H'.$row, $student->mobile_no);
+        $sheet->setCellValue('I'.$row, $student->whatsapp_no);
+        $sheet->setCellValue('J'.$row, $student->family_code);
+        $sheet->setCellValue('K'.$row, $student->is_active ? 'Active' : 'Inactive');
+
+        $row++;
+    }
+
+    foreach (range('A', 'K') as $column) {
+        $sheet->getColumnDimension($column)->setAutoSize(true);
+    }
+
+    $writer = new Xlsx($spreadsheet);
+
+    return new StreamedResponse(function () use ($writer) {
+        $writer->save('php://output');
+    }, 200, [
+        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition' => 'attachment; filename="Students.xlsx"',
+        'Cache-Control' => 'max-age=0',
+    ]);
+}
+/*
+
+
 
     /*
     |--------------------------------------------------------------------------
     | CREATE FORM
     |--------------------------------------------------------------------------
     */
+
 
     public function create()
     {

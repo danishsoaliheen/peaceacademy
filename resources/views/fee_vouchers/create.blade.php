@@ -96,31 +96,7 @@
     .prev-breakdown thead tr { background: #ffedd5; }
     .prev-breakdown th { font-size: 11px; color: #9a3412; }
     .prev-breakdown td { background: white; }
-
-    .include-prev-balance {
-        margin-top: 14px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        background: white;
-        border: 1px solid #fed7aa;
-        border-radius: 6px;
-        padding: 10px 14px;
-    }
-
-    .include-prev-balance input[type=checkbox] {
-        width: auto;
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-    }
-
-    .include-prev-balance label {
-        font-size: 13px;
-        font-weight: 600;
-        color: #9a3412;
-        cursor: pointer;
-    }
+    .prev-breakdown input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
 
     .prev-balance-loader {
         display: none;
@@ -242,31 +218,25 @@
             ⏳ Checking previous balance…
         </div>
 
-        {{-- ── Previous Balance Panel (shown only when student has arrears) ── --}}
+        {{-- ── Previous Balance Panel (shown only when student has any open voucher) ── --}}
         <div id="prev-balance-panel">
 
             <div class="panel-header">
                 <div class="panel-title">
-                    ⚠️ Previous Outstanding Balance
+                    ⚠️ Previous Outstanding Vouchers
                 </div>
                 <div class="total-amount" id="prev-bal-amount-display">Rs. 0</div>
             </div>
 
             <div class="prev-breakdown" id="prev-breakdown-table"></div>
 
-            <div class="include-prev-balance">
-                <input type="checkbox"
-                       id="include_prev_balance"
-                       name="include_previous_balance"
-                       value="1">
-                <input type="hidden"
-                       name="previous_balance_amount"
-                       id="previous_balance_amount"
-                       value="0">
-                <label for="include_prev_balance">
-                    Include Previous Balance in this voucher
-                    (will add it as a separate line item and update the total)
-                </label>
+            <div style="margin-top:12px; font-size:12px; color:#9a3412; background:white;
+                        border:1px solid #fed7aa; border-radius:6px; padding:10px 14px;">
+                Tick any voucher(s) above to roll their balance into this new voucher as a line item.
+                Every voucher you tick will be marked <strong>Carried Forward (C.F)</strong> and its
+                balance zeroed once this voucher is saved — so nothing gets counted twice. Leave a
+                voucher unticked to keep it open and separate. The amount is always recalculated from
+                the server at save time, not just the figure shown here.
             </div>
 
         </div>
@@ -424,15 +394,12 @@
 
     function showPrevBalancePanel(data) {
 
-        const panel  = document.getElementById('prev-balance-panel');
-        const amtDisp = document.getElementById('prev-bal-amount-display');
-        const hiddenAmt = document.getElementById('previous_balance_amount');
+        const panel = document.getElementById('prev-balance-panel');
 
-        amtDisp.textContent = 'Rs. ' + data.previous_balance.toLocaleString('en-PK', { maximumFractionDigits: 0 });
-        hiddenAmt.value = data.previous_balance;
-
-        // Build breakdown table
+        // Build breakdown table — one checkbox per voucher, all unticked
+        // by default. Nothing is included until the user explicitly picks it.
         let html = '<table><thead><tr>';
+        html += '<th style="width:30px; text-align:center;"><input type="checkbox" id="prevSelectAll" title="Select all"></th>';
         html += '<th>Voucher No</th><th>Month</th><th style="text-align:right">Payable</th>';
         html += '<th style="text-align:right">Paid</th><th style="text-align:right">Balance</th><th>Status</th>';
         html += '</tr></thead><tbody>';
@@ -440,6 +407,11 @@
         data.overdue_vouchers.forEach(v => {
             const statusColor = v.status === 'partial' ? '#d97706' : '#dc2626';
             html += `<tr>
+                <td style="text-align:center;">
+                    <input type="checkbox" class="prev-voucher-check"
+                           name="selected_previous_vouchers[]" value="${v.id}"
+                           data-balance="${v.balance_amount}">
+                </td>
                 <td><code style="font-size:11px;">${v.voucher_no}</code></td>
                 <td>${v.due_date}</td>
                 <td style="text-align:right">Rs. ${Number(v.payable_amount).toLocaleString('en-PK',{maximumFractionDigits:0})}</td>
@@ -457,9 +429,20 @@
         html += '</tbody></table>';
         document.getElementById('prev-breakdown-table').innerHTML = html;
 
+        // "Select all" toggles every row checkbox
+        document.getElementById('prevSelectAll').addEventListener('change', function () {
+            document.querySelectorAll('.prev-voucher-check').forEach(cb => cb.checked = this.checked);
+            calculateTotals();
+        });
+
+        // Each row checkbox recalculates the total when toggled
+        document.querySelectorAll('.prev-voucher-check').forEach(cb => {
+            cb.addEventListener('change', calculateTotals);
+        });
+
         panel.classList.add('has-balance');
 
-        // Recalculate totals
+        // Recalculate totals (nothing selected yet, so this just resets the display)
         calculateTotals();
     }
 
@@ -467,11 +450,7 @@
 
         const panel = document.getElementById('prev-balance-panel');
         panel.classList.remove('has-balance');
-
-        document.getElementById('previous_balance_amount').value = 0;
-
-        const cb = document.getElementById('include_prev_balance');
-        if (cb) cb.checked = false;
+        document.getElementById('prev-breakdown-table').innerHTML = '';
 
         calculateTotals();
     }
@@ -508,34 +487,54 @@
 
         const discount = parseFloat(document.getElementById('discount').value) || 0;
 
-        // Previous balance
-        const includePrev  = document.getElementById('include_prev_balance')?.checked;
-        const prevBalAmt   = parseFloat(document.getElementById('previous_balance_amount').value) || 0;
-        const prevBalRow   = document.getElementById('prev-bal-row');
-        const prevBalInput = document.getElementById('prev_bal_in_totals');
+        // Previous balance = sum of whichever voucher rows are ticked
+        let prevBalIncluded = 0;
+        document.querySelectorAll('.prev-voucher-check:checked').forEach(function (cb) {
+            prevBalIncluded += parseFloat(cb.dataset.balance) || 0;
+        });
 
-        if (includePrev && prevBalAmt > 0) {
+        const prevBalRow    = document.getElementById('prev-bal-row');
+        const prevBalInput  = document.getElementById('prev_bal_in_totals');
+        const prevAmtDisp   = document.getElementById('prev-bal-amount-display');
+
+        if (prevAmtDisp) {
+            prevAmtDisp.textContent = 'Rs. ' + prevBalIncluded.toLocaleString('en-PK', { maximumFractionDigits: 0 });
+        }
+
+        if (prevBalIncluded > 0) {
             prevBalRow.style.display = '';
-            prevBalInput.value = prevBalAmt;
+            prevBalInput.value = prevBalIncluded;
         } else {
             prevBalRow.style.display = 'none';
             prevBalInput.value = '';
         }
 
-        const prevBalIncluded = (includePrev && prevBalAmt > 0) ? prevBalAmt : 0;
+        // ── Base amount: fee items minus discount ONLY ──────────────────
+        // This is what actually gets submitted in total_amount/payable_amount.
+        // The previous balance is deliberately NOT folded in here — the
+        // server adds the real, re-verified previous balance on top of this
+        // exactly once, after checking which vouchers were actually ticked.
+        // If it were baked in here too, the server's addition would double
+        // it (e.g. base 6000 + prevBal 4200 submitted as 10200, then server
+        // adds 4200 again = 14400).
+        const baseTotal   = subtotal - discount;
+        const basePayable = Math.max(0, baseTotal);
 
-        const total = subtotal + prevBalIncluded - discount;
-        const payable = Math.max(0, total);
+        // Combined total — for the on-screen display and "Amount in Words"
+        // only, never submitted as payable_amount/total_amount.
+        const displayPayable = Math.max(0, baseTotal + prevBalIncluded);
 
         document.getElementById('total_display').value      = subtotal;
         document.getElementById('total_amount').value       = subtotal;
-        document.getElementById('payable_amount').value     = payable;
+        document.getElementById('payable_amount').value     = basePayable;
         document.getElementById('grand-total-display').textContent =
-            'Rs. ' + payable.toLocaleString('en-PK', { maximumFractionDigits: 0 });
+            'Rs. ' + displayPayable.toLocaleString('en-PK', { maximumFractionDigits: 0 });
 
-        // Auto-fill Amount in Words
+        // Auto-fill Amount in Words — reflects the TRUE final total
+        // (base + previous balance), matching what the voucher will
+        // actually show once the server adds the previous balance line.
         document.getElementById('amount_in_words').value =
-            payable > 0 ? numberToWords(Math.round(payable)) + ' Only' : '';
+            displayPayable > 0 ? numberToWords(Math.round(displayPayable)) + ' Only' : '';
     }
 
     /* ═══════════════════════════════════════════════════
@@ -667,11 +666,6 @@
             e.preventDefault();
             addRow();
         }
-    });
-
-    // Include Previous Balance checkbox
-    document.getElementById('include_prev_balance').addEventListener('change', function () {
-        calculateTotals();
     });
 
     // Class filter for students

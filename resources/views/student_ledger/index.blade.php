@@ -273,6 +273,36 @@
         border-color: #0d6efd;
     }
 
+    /* ── Sortable column headers ── */
+    .results-table th.sortable { padding: 0; }
+
+    .sort-link {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 9px 13px;
+        color: #64748b;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .sort-link:hover { color: #0d6efd; }
+
+    .sort-link .sort-icon {
+        font-size: 10px;
+        opacity: .35;
+    }
+
+    .sort-link.active {
+        color: #1e293b;
+        font-weight: 700;
+    }
+
+    .sort-link.active .sort-icon {
+        opacity: 1;
+        color: #0d6efd;
+    }
+
 </style>
 
 <div class="ledger-card">
@@ -329,10 +359,17 @@
                     @endforeach
                 </select>
 
-                <select name="sort" class="form-select">
-                    <option value="name" {{ $sort === 'name' ? 'selected' : '' }}>Sort: Name (A–Z)</option>
-                    <option value="outstanding" {{ $sort === 'outstanding' ? 'selected' : '' }}>Sort: Biggest Dues First</option>
+                <select name="status" class="form-select">
+                    <option value="1" {{ (string)$statusFilter === '1' ? 'selected' : '' }}>Active</option>
+                    <option value="0" {{ (string)$statusFilter === '0' ? 'selected' : '' }}>Inactive</option>
+                    <option value="all" {{ (string)$statusFilter === 'all' ? 'selected' : '' }}>All</option>
                 </select>
+
+                {{-- Sorting is done via the clickable column headers below;
+                     these hidden fields just carry the current sort along
+                     when a filter is applied so it isn't reset to default. --}}
+                <input type="hidden" name="sort" value="{{ $sort }}">
+                <input type="hidden" name="direction" value="{{ $direction }}">
 
                 <label class="filter-check">
                     <input type="checkbox" name="outstanding_only" value="1" {{ $outstandingOnly ? 'checked' : '' }}>
@@ -364,17 +401,74 @@
             @if($query) — filtered by "<strong>{{ $query }}</strong>" @endif
         </div>
 
+        @php
+            // Column-specific default direction the first time it's clicked
+            // (matches StudentLedgerController::SORT_DEFAULT_DIRECTIONS).
+            $sortDefaultDirections = [
+                'name'         => 'asc',
+                'admission_no' => 'asc',
+                'father_name'  => 'asc',
+                'class'        => 'asc',
+                'outstanding'  => 'desc',
+            ];
+
+            $buildSortUrl = function (string $column) use ($sort, $direction, $sortDefaultDirections) {
+                $newDirection = $sort === $column
+                    ? ($direction === 'asc' ? 'desc' : 'asc')
+                    : $sortDefaultDirections[$column];
+
+                // Keep every current filter (search, class_id, outstanding_only…)
+                // but drop the old page number so sorting starts back at page 1.
+                $params = array_merge(
+                    request()->except('page'),
+                    ['sort' => $column, 'direction' => $newDirection]
+                );
+
+                return request()->url() . '?' . http_build_query($params);
+            };
+        @endphp
+
         {{-- Table --}}
         <table class="results-table">
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>Adm. No</th>
-                    <th>Student Name</th>
-                    <th>Father Name</th>
-                    <th>Class</th>
+                    <th class="sortable">
+                        <a href="{{ $buildSortUrl('admission_no') }}"
+                           class="sort-link {{ $sort === 'admission_no' ? 'active' : '' }}">
+                            Adm. No
+                            <i class="fas sort-icon fa-sort{{ $sort === 'admission_no' ? ($direction === 'asc' ? '-up' : '-down') : '' }}"></i>
+                        </a>
+                    </th>
+                    <th class="sortable">
+                        <a href="{{ $buildSortUrl('name') }}"
+                           class="sort-link {{ $sort === 'name' ? 'active' : '' }}">
+                            Student Name
+                            <i class="fas sort-icon fa-sort{{ $sort === 'name' ? ($direction === 'asc' ? '-up' : '-down') : '' }}"></i>
+                        </a>
+                    </th>
+                    <th class="sortable">
+                        <a href="{{ $buildSortUrl('father_name') }}"
+                           class="sort-link {{ $sort === 'father_name' ? 'active' : '' }}">
+                            Father Name
+                            <i class="fas sort-icon fa-sort{{ $sort === 'father_name' ? ($direction === 'asc' ? '-up' : '-down') : '' }}"></i>
+                        </a>
+                    </th>
+                    <th class="sortable">
+                        <a href="{{ $buildSortUrl('class') }}"
+                           class="sort-link {{ $sort === 'class' ? 'active' : '' }}">
+                            Class
+                            <i class="fas sort-icon fa-sort{{ $sort === 'class' ? ($direction === 'asc' ? '-up' : '-down') : '' }}"></i>
+                        </a>
+                    </th>
                     <th>Last Voucher</th>
-                    <th>Outstanding</th>
+                    <th class="sortable">
+                        <a href="{{ $buildSortUrl('outstanding') }}"
+                           class="sort-link {{ $sort === 'outstanding' ? 'active' : '' }}">
+                            Outstanding
+                            <i class="fas sort-icon fa-sort{{ $sort === 'outstanding' ? ($direction === 'asc' ? '-up' : '-down') : '' }}"></i>
+                        </a>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>
