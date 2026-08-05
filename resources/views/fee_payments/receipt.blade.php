@@ -403,9 +403,28 @@
     </div>
 </div>
 
+
+    @if($download)
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    window.onload = function () {
+        const element  = document.querySelector('.receipt');
+        const filename = 'Receipt-{{ $payment->receipt_no ?? $payment->id }}.pdf';
+
+        html2pdf().set({
+            margin: 10,
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(element).save();
+    };
+</script>
+@else
 <script>
     window.onload = function () { window.print(); };
 </script>
+@endif
 
 </body>
 </html>

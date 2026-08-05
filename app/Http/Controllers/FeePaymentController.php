@@ -14,6 +14,103 @@ class FeePaymentController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
+    | Sortable columns whitelist
+    |--------------------------------------------------------------------------
+    | Table names are explicit (fee_payments./students./fee_vouchers.) because
+    | the index/export queries left-join students and fee_vouchers to allow
+    | sorting by student name / voucher number.
+    |--------------------------------------------------------------------------
+    */
+
+    private const SORTABLE_COLUMNS = [
+        'id'             => 'fee_payments.id',
+        'receipt_no'     => 'fee_payments.receipt_no',
+        'student'        => 'students.student_name',
+        'voucher'        => 'fee_vouchers.voucher_no',
+        'amount_paid'    => 'fee_payments.amount_paid',
+        'payment_date'   => 'fee_payments.payment_date',
+        'payment_method' => 'fee_payments.payment_method',
+        'received_by'    => 'fee_payments.received_by',
+    ];
+
+    private const SORT_DEFAULT_DIRECTIONS = [
+        'id'             => 'desc',
+        'receipt_no'     => 'desc',
+        'student'        => 'asc',
+        'voucher'        => 'asc',
+        'amount_paid'    => 'desc',
+        'payment_date'   => 'desc',
+        'payment_method' => 'asc',
+        'received_by'    => 'asc',
+    ];
+
+    private function resolveSort(Request $request): array
+    {
+        $sort = $request->string('sort')->toString();
+        if ($sort === '' || !array_key_exists($sort, self::SORTABLE_COLUMNS)) {
+            $sort = 'payment_date';
+        }
+
+        $direction = strtolower($request->string('direction')->toString());
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            $direction = self::SORT_DEFAULT_DIRECTIONS[$sort];
+        }
+
+        return [$sort, $direction];
+    }
+
+    /**
+     * Shared filtered + joined query for index() and export().
+     *
+     * Date range defaults to the CURRENT MONTH unless the user explicitly
+     * supplied from_date / to_date — this is the new default behaviour
+     * requested (previously it showed all-time history with no default
+     * window at all).
+     *
+     * Returns [query, fromDate, toDate] so both callers stay in sync.
+     */
+    private function buildFilteredQuery(Request $request): array
+    {
+        $fromDate = $request->filled('from_date')
+            ? $request->from_date
+            : now()->startOfMonth()->format('Y-m-d');
+
+        $toDate = $request->filled('to_date')
+            ? $request->to_date
+            : now()->endOfMonth()->format('Y-m-d');
+
+        $query = FeePayment::query()
+            ->leftJoin('students', 'students.id', '=', 'fee_payments.student_id')
+            ->leftJoin('fee_vouchers', 'fee_vouchers.id', '=', 'fee_payments.voucher_id')
+            ->select('fee_payments.*')
+            ->with(['student', 'voucher'])
+            ->whereBetween('fee_payments.payment_date', [$fromDate, $toDate]);
+
+        if ($request->filled('student_id')) {
+            $query->where('fee_payments.student_id', $request->student_id);
+        }
+
+        return [$query, $fromDate, $toDate];
+    }
+
+    private function applySort($query, string $sort, string $direction)
+    {
+        $column = self::SORTABLE_COLUMNS[$sort];
+
+        $query->orderBy($column, $direction);
+
+        // Stable secondary sort so rows with equal values (e.g. same date)
+        // don't jump around between page loads.
+        if ($sort !== 'payment_date') {
+            $query->orderBy('fee_payments.payment_date', 'desc');
+        }
+        $query->orderBy('fee_payments.id', 'desc');
+
+        return $query;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Show Payment Form
     |--------------------------------------------------------------------------
     */
@@ -45,18 +142,8 @@ class FeePaymentController extends Controller
         $payment = DB::transaction(function () use ($request) {
             $voucher = FeeVoucher::lockForUpdate()->findOrFail($request->voucher_id);
 
-            /*
-            |----------------------------------------------------------------------
-            | Atomic receipt number generation (prevents duplicates)
-            |----------------------------------------------------------------------
-            */
             $receiptNo = FeeVoucher::nextReceiptNo();
 
-            /*
-            |----------------------------------------------------------------------
-            | Create payment record
-            |----------------------------------------------------------------------
-            */
             return FeePayment::create([
                 'voucher_id'     => $voucher->id,
                 'student_id'     => $request->student_id,
@@ -70,18 +157,8 @@ class FeePaymentController extends Controller
             ]);
         });
 
-        /*
-        |----------------------------------------------------------------------
-        | Recalculate voucher balance (single source of truth)
-        |----------------------------------------------------------------------
-        */
         $payment->voucher->recalculateBalance();
 
-        /*
-        |----------------------------------------------------------------------
-        | Redirect to receipt or back to voucher list
-        |----------------------------------------------------------------------
-        */
         if ($request->has('print_receipt')) {
             return redirect()->route('fee-payments.receipt', $payment->id);
         }
@@ -93,36 +170,20 @@ class FeePaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Payment History (all payments)
+    | Payment History (all payments) — defaults to current month
     |--------------------------------------------------------------------------
     */
 
     public function index(Request $request)
     {
-        $query = FeePayment::with(['student', 'voucher'])
-            ->orderByDesc('payment_date')
-            ->orderByDesc('id');
+        [$sort, $direction]        = $this->resolveSort($request);
+        [$query, $fromDate, $toDate] = $this->buildFilteredQuery($request);
 
-        if ($request->student_id) {
-            $query->where('student_id', $request->student_id);
-        }
+        // Total for the header card must reflect the FULL filtered set,
+        // not just the current page — clone before pagination.
+        $totalReceived = (clone $query)->sum('fee_payments.amount_paid');
 
-        if ($request->from_date) {
-            $query->where('payment_date', '>=', $request->from_date);
-        }
-
-        if ($request->to_date) {
-            $query->where('payment_date', '<=', $request->to_date);
-        }
-
-        /*
-        |----------------------------------------------------------------------
-        | FIX: Clone the query BEFORE pagination to get correct total.
-        | Previously $query->sum() ran on the paginated query, returning
-        | only the current page's sum instead of the full total.
-        |----------------------------------------------------------------------
-        */
-        $totalReceived = (clone $query)->sum('amount_paid');
+        $this->applySort($query, $sort, $direction);
 
         $payments = $query->paginate(30)->withQueryString();
 
@@ -130,7 +191,36 @@ class FeePaymentController extends Controller
             ->orderBy('student_name')
             ->get(['id', 'student_name', 'admission_no']);
 
-        return view('fee_payments.index', compact('payments', 'totalReceived', 'students'));
+        return view('fee_payments.index', compact(
+            'payments', 'totalReceived', 'students',
+            'sort', 'direction', 'fromDate', 'toDate'
+        ));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Export — same filters/sort as index(), no pagination.
+    | Streams an HTML table with .xls headers (opens directly in Excel),
+    | same lightweight approach as student_ledger/export.blade.php.
+    |--------------------------------------------------------------------------
+    */
+
+    public function export(Request $request)
+    {
+        [$sort, $direction]          = $this->resolveSort($request);
+        [$query, $fromDate, $toDate] = $this->buildFilteredQuery($request);
+
+        $this->applySort($query, $sort, $direction);
+
+        $payments      = $query->get();
+        $totalReceived = $payments->sum('amount_paid');
+
+        $filename = 'payment-history_' . date('Y-m-d_His') . '.xls';
+
+        return response()
+            ->view('fee_payments.export', compact('payments', 'totalReceived', 'fromDate', 'toDate'))
+            ->header('Content-Type', 'application/vnd.ms-excel; charset=utf-8')
+            ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
     }
 
     /*
@@ -145,11 +235,6 @@ class FeePaymentController extends Controller
 
         $paymentMethods = PaymentMethodHelper::enabled();
 
-        // If the voucher is fully paid OR has been carried forward (closed
-        // out into a new voucher), only allow correcting payment
-        // method/reference/notes. Amount and date are locked so we never
-        // trigger recalculateBalance() into resetting balance_amount away
-        // from 0 on a voucher that's supposed to be closed.
         $methodOnlyMode = in_array($payment->voucher->status, ['paid', 'carried_forward'], true);
 
         return view('fee_payments.edit', compact('payment', 'paymentMethods', 'methodOnlyMode'));
@@ -166,19 +251,9 @@ class FeePaymentController extends Controller
         $payment = FeePayment::findOrFail($id);
         $voucher = FeeVoucher::findOrFail($payment->voucher_id);
 
-        // Same guard as edit(): paid or carried-forward vouchers are closed,
-        // so amount/date stay locked and only the payment method/reference/
-        // notes may be corrected.
         $methodOnlyMode = in_array($voucher->status, ['paid', 'carried_forward'], true);
 
         if ($methodOnlyMode) {
-            /*
-            |------------------------------------------------------------------
-            | Paid / carried-forward voucher — only payment method, reference
-            | & notes may change. Amount and date are untouched so balance
-            | stays correct (and, for carried-forward vouchers, stays at 0).
-            |------------------------------------------------------------------
-            */
             $request->validate([
                 'payment_method' => 'required|string',
             ]);
@@ -194,11 +269,6 @@ class FeePaymentController extends Controller
                 ->with('success', 'Payment method updated successfully.');
         }
 
-        /*
-        |----------------------------------------------------------------------
-        | Normal edit (unpaid / partial voucher)
-        |----------------------------------------------------------------------
-        */
         $request->validate([
             'payment_date' => 'required|date|before_or_equal:today',
             'amount_paid'  => 'required|numeric|min:1',
@@ -223,15 +293,22 @@ class FeePaymentController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Print Receipt
+    | Print / Download Receipt
+    |--------------------------------------------------------------------------
+    | ?download=1 switches the view from auto-print to auto-download-as-PDF
+    | (via html2pdf.js, same library already used on the student profile
+    | page). This is the "Send" action from the payment history list — for
+    | now it just saves the PDF locally; once WhatsApp is wired up this same
+    | generated file becomes what gets sent to the student's WhatsApp number.
     |--------------------------------------------------------------------------
     */
 
-    public function receipt($paymentId)
+    public function receipt(Request $request, $id)
     {
-        $payment = FeePayment::with(['student', 'voucher.items.feeType'])->findOrFail($paymentId);
+        $payment  = FeePayment::with(['student', 'voucher.items.feeType'])->findOrFail($id);
+        $download = $request->boolean('download');
 
-        return view('fee_payments.receipt', compact('payment'));
+        return view('fee_payments.receipt', compact('payment', 'download'));
     }
 
     /*

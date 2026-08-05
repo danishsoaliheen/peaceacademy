@@ -238,12 +238,12 @@ body { background: var(--pa-bg); }
 <div class="row g-3 mt-1">
 
     {{-- Total Students --}}
-    <div class="col-6 col-md-3">
+<div class="col-6 col-md-3">
         <a href="{{ url('/students') }}" class="metric-tile mt-blue">
             <div class="tile-icon ic-blue"><i class="fas fa-users"></i></div>
-            <div class="tile-value">{{ number_format($totalStudents) }}</div>
-            <div class="tile-label">Total Students</div>
-            <div class="tile-sub"><i class="fas fa-circle text-success me-1" style="font-size:.45rem"></i>{{ $activeStudents }} active</div>
+            <div class="tile-value">{{ number_format($activeStudents) }}</div>
+            <div class="tile-label">Active Students</div>
+            <div class="tile-sub"><i class="fas fa-circle text-muted me-1" style="font-size:.45rem"></i>{{ number_format($totalStudents) }} total</div>
             <span class="tile-badge tb-blue"><i class="fas fa-arrow-right me-1"></i>View all</span>
         </a>
     </div>

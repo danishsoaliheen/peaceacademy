@@ -213,10 +213,13 @@
         </a>
 
         <div class="nav-section">Fee Management</div>
-        <a href="{{ route('fee-vouchers.index') }}" class="{{ request()->routeIs('fee-vouchers.*') ? 'active' : '' }}">
+       <a href="{{ route('fee-vouchers.index') }}" class="{{ request()->routeIs('fee-vouchers.*') ? 'active' : '' }}">
             <i class="fas fa-file-invoice-dollar nav-icon"></i> Fee Vouchers
         </a>
-        <a href="{{ route('monthly-fee-generator.create') }}" class="{{ request()->routeIs('monthly-fee-generator.*') ? 'active' : '' }}">
+        <a href="{{ route('fee-matrix.index') }}" class="{{ request()->routeIs('fee-matrix.*') ? 'active' : '' }}">
+            <i class="fas fa-table nav-icon"></i> Fee Matrix
+        </a>
+        <a href="{{ route('monthly-fee-generator.create') }}" class="{{ request()->routeIs('monthly-fee-generator.*') ? 'active' : '' }}">  
             <i class="fas fa-cogs nav-icon"></i> Monthly Fee Engine
         </a>
         <a href="{{ route('class-fee-structures.index') }}" class="{{ request()->routeIs('class-fee-structures.*') ? 'active' : '' }}">

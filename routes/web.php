@@ -145,6 +145,7 @@ Route::middleware(['auth.custom'])->group(function () {
     */
 
     Route::get('/fee-payments',                [FeePaymentController::class, 'index'])  ->name('fee-payments.index');
+    Route::get('/fee-payments/export',          [FeePaymentController::class, 'export']) ->name('fee-payments.export');
     Route::get('/fee-payments/create/{voucher}', [FeePaymentController::class, 'create'])->name('fee-payments.create');
     Route::post('/fee-payments/store',           [FeePaymentController::class, 'store']) ->name('fee-payments.store');
     Route::get('/fee-payments/{id}/receipt',     [FeePaymentController::class, 'receipt'])->name('fee-payments.receipt');
@@ -153,6 +154,7 @@ Route::middleware(['auth.custom'])->group(function () {
     Route::put('/fee-payments/{id}', [FeePaymentController::class, 'update'])->name('fee-payments.update');
     Route::delete('/fee-payments/{id}', [FeePaymentController::class, 'destroy'])->name('fee-payments.destroy');
 
+    
     /*
     |--------------------------------------------------------------------------
     | Fee Voucher Routes
