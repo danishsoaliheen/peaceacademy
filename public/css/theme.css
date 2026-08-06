@@ -1,0 +1,115 @@
+ ============================================================
+   Peace Academy — Brand Theme
+   Colors pulled from the logo navy text arc, bluegreen globe
+   ============================================================ 
+
+root {
+    --pa-navy-900 #14284a;    deepest navy — sidebar base 
+    --pa-navy-800 #1b3760;    gradient end 
+    --pa-blue-600 #2d6cb5;    globe ocean blue — linksinfo 
+    --pa-blue-500 #3b82c9;    lighter blue accents 
+    --pa-green-600 #3f9142;   globe land green — successpositive 
+    --pa-green-500 #4caf50;
+    --pa-gold-500  #b7862f;   olive branch — warm accent 
+    --pa-white     #ffffff;
+
+     Bootstrap variable overrides (Bootstrap 5.3 CDN reads these) 
+    --bs-primary var(--pa-navy-800);
+    --bs-primary-rgb 27, 55, 96;
+    --bs-success var(--pa-green-600);
+    --bs-success-rgb 63, 145, 66;
+    --bs-info var(--pa-blue-600);
+    --bs-info-rgb 45, 108, 181;
+}
+
+ ── Sidebar  Menu ──────────────────────────────────────────── 
+.sidebar {
+    background var(--pa-navy-900) !important;
+}
+.sidebar-brand .logo-icon {
+    background var(--pa-blue-600) !important;
+}
+.sidebar a.active {
+    background rgba(59, 130, 201, .18) !important;
+    border-left-color var(--pa-blue-500) !important;
+}
+.sidebar ahover {
+    background rgba(255,255,255,.06) !important;
+}
+
+ ── Page headings  hero banners ───────────────────────────── 
+.page-hero,
+.dash-hero,
+.ledger-card .card-header,
+.voucher-container h2,
+.pdf-header-bar {
+    background linear-gradient(135deg, var(--pa-navy-900) 0%, var(--pa-navy-800) 100%) !important;
+}
+
+.section-card .card-header .s-icon,
+.section-card .card-header .section-icon {
+    background var(--pa-blue-600) !important;
+}
+
+ Table headers (used across pa-table, fin-table, results-table, etc.) 
+.pa-table thead th,
+.fin-table thead th,
+.results-table thead tr,
+table th,
+.table-dark,
+thead.table-dark {
+    background var(--pa-navy-900) !important;
+    color var(--pa-white) !important;
+}
+
+ ── Buttons ─────────────────────────────────────────────────── 
+.btn-primary,
+.btn.btn-primary,
+button.btn-primary {
+    background-color var(--pa-blue-600) !important;
+    border-color var(--pa-blue-600) !important;
+}
+.btn-primaryhover {
+    background-color var(--pa-navy-800) !important;
+    border-color var(--pa-navy-800) !important;
+}
+
+.btn-save,
+.btn-login {
+    background linear-gradient(135deg, var(--pa-navy-900), var(--pa-navy-800)) !important;
+}
+
+.btn-hero-ghost {
+    border-color rgba(255,255,255,.25) !important;
+}
+
+.btn-icon-blue,
+.vno-link, .rcpt-link, .last-voucher-link {
+    color var(--pa-blue-600) !important;
+}
+.btn-icon-blue {
+    background rgba(45,108,181,.12) !important;
+}
+
+.btn-icon-green,
+.badge-balance.none,
+.pa-badge-green {
+    background rgba(63,145,66,.14) !important;
+    color var(--pa-green-600) !important;
+}
+
+ Success alerts  badges tie to brand green rather than default Bootstrap green 
+.alert-success {
+    background rgba(63,145,66,.10) !important;
+    color var(--pa-green-600) !important;
+}
+
+ Login page branding 
+.login-brand .logo-icon,
+body.login-body {
+    background linear-gradient(135deg, var(--pa-blue-600), var(--pa-navy-800)) !important;
+}
+
+ Links generally 
+a { color var(--pa-blue-600); }
+ahover { color var(--pa-navy-800); }
