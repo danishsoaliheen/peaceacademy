@@ -9,45 +9,30 @@
 
     * { box-sizing: border-box; }
 
-    .voucher-container {
-        background: white;
-        padding: 24px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
-    .voucher-container h2 {
-        margin-bottom: 0;
-        font-size: 20px;
-        color: #1e293b;
-    }
-
-    .page-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 20px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid #e2e8f0;
-    }
-
     table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    table th, table td { border: 1px solid #dcdcdc; padding: 10px; vertical-align: middle; }
-    table th { background: #f8fafc; text-align: left; font-size: 13px; color: #475569; }
+    table th, table td { border: 1px solid var(--border-color, #dcdcdc); padding: 10px; vertical-align: middle; }
+    table th { background: var(--bg-body, #f8fafc); text-align: left; font-size: 13px; color: var(--text-secondary, #475569); }
 
     input, select, textarea {
         width: 100%;
         padding: 8px;
-        border: 1px solid #ccc;
+        border: 1px solid var(--border-color, #ccc);
         border-radius: 4px;
         font-size: 13px;
+        background: var(--input-bg, #fff);
+        color: var(--text-primary, #1e293b);
     }
 
-    input:focus, select:focus { outline: none; border-color: #0d6efd; box-shadow: 0 0 0 3px rgba(13,110,253,.1); }
+    input:focus, select:focus {
+        outline: none;
+        border-color: var(--accent-primary, #0d6efd);
+        box-shadow: 0 0 0 3px rgba(45,108,181,.15);
+    }
 
     textarea { resize: vertical; }
     .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; }
-    .btn-primary { background: #0d6efd; color: white; }
+    .btn-primary { background: var(--accent-primary, #0d6efd); color: white; }
+    .btn-primary:hover { background: var(--accent-primary-hover, #0b5ed7); }
     .btn-danger { background: #dc2626; color: white; }
     .btn:hover { opacity: 0.9; }
     .row-no { text-align: center; font-weight: bold; }
@@ -55,8 +40,8 @@
     /* ── Previous Balance Panel ──────────────────────── */
     #prev-balance-panel {
         display: none;
-        background: #fff7ed;
-        border: 1px solid #fed7aa;
+        background: rgba(183,134,47,.08);
+        border: 1px solid rgba(183,134,47,.35);
         border-radius: 8px;
         padding: 16px 20px;
         margin-bottom: 20px;
@@ -76,7 +61,7 @@
     #prev-balance-panel .panel-title {
         font-size: 14px;
         font-weight: 700;
-        color: #c2410c;
+        color: var(--accent-gold, #c2410c);
         display: flex;
         align-items: center;
         gap: 8px;
@@ -85,7 +70,7 @@
     #prev-balance-panel .total-amount {
         font-size: 22px;
         font-weight: 800;
-        color: #c2410c;
+        color: var(--accent-gold, #c2410c);
     }
 
     .prev-breakdown table {
@@ -93,42 +78,45 @@
         font-size: 12px;
     }
 
-    .prev-breakdown thead tr { background: #ffedd5; }
-    .prev-breakdown th { font-size: 11px; color: #9a3412; }
-    .prev-breakdown td { background: white; }
+    .prev-breakdown thead tr { background: rgba(183,134,47,.12); }
+    .prev-breakdown th { font-size: 11px; color: var(--accent-gold, #9a3412); }
+    .prev-breakdown td { background: var(--bg-surface, #fff); }
     .prev-breakdown input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
 
     .prev-balance-loader {
         display: none;
-        color: #94a3b8;
+        color: var(--text-secondary, #94a3b8);
         font-size: 13px;
         padding: 8px 0;
     }
 
     /* ── Totals Row ──────────────────────────────────── */
-    #total-row { background: #f8fafc; }
+    #total-row { background: var(--bg-body, #f8fafc); }
     #total-row td { font-weight: 700; }
-    #grand-total-display { font-size: 20px; font-weight: 800; color: #0d6efd; }
-    #prev-bal-row { display: none; background: #fff7ed; }
+    #grand-total-display { font-size: 20px; font-weight: 800; color: var(--accent-primary, #0d6efd); }
+    #prev-bal-row { display: none; background: rgba(183,134,47,.08); }
 
 </style>
 
-<div class="voucher-container">
-
-    <div class="page-header">
-        <h2>🧾 New Fee Voucher</h2>
-        <a href="{{ route('fee-vouchers.index') }}"
-           style="padding:7px 14px; background:#f1f5f9; color:#475569;
-                  border:1px solid #e2e8f0; border-radius:6px; text-decoration:none; font-size:13px;">
-            ← Back to Vouchers
+<div class="page-hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <h2><i class="fas fa-receipt me-2" style="opacity:.8;"></i>New Fee Voucher</h2>
+            <p>Create a fee voucher and optionally roll in any previous outstanding balance</p>
+        </div>
+        <a href="{{ route('fee-vouchers.index') }}" class="btn-hero-ghost">
+            <i class="fas fa-arrow-left"></i> Back to Vouchers
         </a>
     </div>
+</div>
+
+<div class="section-card card">
+<div class="card-body">
 
     @if($errors->any())
-        <div style="background:#fee2e2; color:#991b1b; padding:12px 16px;
-                    border-radius:6px; margin-bottom:20px; font-size:13px;">
-            <strong>Please fix the following errors:</strong>
-            <ul style="margin:6px 0 0 16px;">
+        <div class="alert alert-danger">
+            <strong><i class="fas fa-exclamation-triangle me-1"></i>Please fix the following:</strong>
+            <ul class="mb-0 mt-2">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
@@ -330,17 +318,16 @@
             </tr>
         </table>
 
-        <div style="display:flex; gap:12px; margin-top:8px;">
-            <button type="submit" class="btn btn-primary">💾 Save Voucher</button>
-            <a href="{{ route('fee-vouchers.index') }}"
-               style="padding:10px 20px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;
-                      border-radius:4px; text-decoration:none; font-size:13px;">
+        <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn-save"><i class="fas fa-save"></i> Save Voucher</button>
+            <a href="{{ route('fee-vouchers.index') }}" class="btn btn-outline-secondary" style="border-radius:8px;">
                 Cancel
             </a>
         </div>
 
     </form>
 
+</div>
 </div>
 
 <script>
@@ -749,4 +736,4 @@
 
 </script>
 
-@endsection
+@endsection 
