@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ strtoupper($voucher->student->student_name ?? '') }} — {{ $voucher->voucher_no ?? $voucher->id }}</title>
+    <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
     <style>
 
         /* ── Reset & Base ─────────────────────────────── */
@@ -11,7 +12,7 @@
         body {
             font-family: 'Courier New', monospace;
             font-size: 13px;
-            background: #e5e5e5;
+            background: var(--bg-body, #e5e5e5);
             color: #000;
             padding: 24px;
         }
@@ -25,7 +26,7 @@
             align-items: center;
         }
         .btn-print {
-            background: #000;
+            background: var(--accent-primary, #0f1f3d);
             color: #fff;
             border: none;
             padding: 9px 22px;
@@ -37,11 +38,11 @@
             align-items: center;
             gap: 7px;
         }
-        .btn-print:hover { background: #333; }
+        .btn-print:hover { background: var(--accent-primary-hover, #1b3760); }
         .btn-back {
-            background: #f1f1f1;
-            color: #000;
-            border: 1px solid #000;
+            background: transparent;
+            color: var(--accent-primary, #0f1f3d);
+            border: 1px solid var(--accent-primary, #0f1f3d);
             padding: 9px 18px;
             font-size: 13px;
             font-weight: 700;

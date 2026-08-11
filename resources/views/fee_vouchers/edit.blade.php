@@ -7,16 +7,11 @@
 
 <style>
 
-    body{
-        font-family:Arial, sans-serif;
-        background:#f5f5f5;
-    }
-
     .voucher-container{
-        background:#fff;
+        background:var(--bg-surface, #fff);
         padding:20px;
         border-radius:8px;
-        box-shadow:0 0 10px rgba(0,0,0,0.08);
+        box-shadow:var(--card-shadow, 0 0 10px rgba(0,0,0,0.08));
     }
 
     table{
@@ -27,12 +22,13 @@
 
     table th,
     table td{
-        border:1px solid #ddd;
+        border:1px solid var(--border-color, #ddd);
         padding:10px;
     }
 
     table th{
-        background:#f0f0f0;
+        background:var(--bg-body, #f0f0f0);
+        color:var(--text-secondary, #475569);
     }
 
     input,
@@ -40,15 +36,23 @@
     textarea{
         width:100%;
         padding:8px;
-        border:1px solid #ccc;
+        border:1px solid var(--border-color, #ccc);
         border-radius:4px;
+        background:var(--input-bg, #fff);
+        color:var(--text-primary, #1e293b);
+    }
+
+    input:focus, select:focus {
+        outline: none;
+        border-color: var(--accent-primary, #0d6efd);
+        box-shadow: 0 0 0 3px rgba(45,108,181,.15);
     }
 
     input[readonly],
     input:disabled,
     select:disabled{
-        background:#f1f5f9;
-        color:#64748b;
+        background:var(--bg-body, #f1f5f9);
+        color:var(--text-secondary, #64748b);
         cursor:not-allowed;
     }
 
@@ -61,7 +65,7 @@
     }
 
     .btn-primary{
-        background:#0d6efd;
+        background:var(--accent-primary, #0d6efd);
         color:white;
     }
 
@@ -71,7 +75,7 @@
     }
 
     .btn-danger{
-        background:red;
+        background:#dc2626;
         color:white;
     }
 
@@ -86,9 +90,9 @@
     }
 
     .lock-banner{
-        background:#fffbeb;
-        border:1px solid #fde68a;
-        color:#92400e;
+        background:rgba(183,134,47,.08);
+        border:1px solid rgba(183,134,47,.35);
+        color:var(--accent-gold, #92400e);
         padding:12px 16px;
         border-radius:6px;
         font-size:.85rem;
@@ -104,7 +108,7 @@
     }
 
     .lock-banner a{
-        color:#92400e;
+        color:var(--accent-gold, #92400e);
         font-weight:700;
         text-decoration:underline;
     }
@@ -126,17 +130,24 @@
 
 </style>
 
-<div class="container mt-4">
+<div class="page-hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <h2>
+                <i class="fas fa-file-pen me-2" style="opacity:.8;"></i>Edit Fee Voucher
+                @php $statusLower = strtolower($voucher->status); @endphp
+                <span class="status-chip chip-{{ $statusLower }}">{{ ucfirst($voucher->status) }}</span>
+            </h2>
+            <p>Voucher {{ $voucher->voucher_no }}</p>
+        </div>
+        <a href="{{ route('fee-vouchers.index') }}" class="btn-hero-ghost">
+            <i class="fas fa-arrow-left"></i> Back to Vouchers
+        </a>
+    </div>
+</div>
 
-    <div class="voucher-container">
-
-        <h2>
-            Edit Fee Voucher
-            @php $statusLower = strtolower($voucher->status); @endphp
-            <span class="status-chip chip-{{ $statusLower }}">{{ ucfirst($voucher->status) }}</span>
-        </h2>
-
-        <hr>
+<div class="section-card card">
+    <div class="card-body">
 
         {{-- ════════════════════════════════════════════════
              LOCK NOTICE — shown when payment(s) already exist
@@ -153,16 +164,16 @@
                 — the voucher balance will recalculate automatically.
 
                 @if($voucher->payments->count() > 0)
-                <div style="margin-top:10px;background:#fff;border:1px solid #fde68a;border-radius:6px;padding:8px 12px">
+                <div style="margin-top:10px;background:var(--bg-surface,#fff);border:1px solid rgba(183,134,47,.35);border-radius:6px;padding:8px 12px">
                     @foreach($voucher->payments->sortByDesc('payment_date') as $pmt)
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;{{ !$loop->last ? 'border-bottom:1px solid #fef3c7' : '' }}">
-                            <span style="font-size:.8rem;color:#78350f">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;{{ !$loop->last ? 'border-bottom:1px solid rgba(183,134,47,.2)' : '' }}">
+                            <span style="font-size:.8rem;color:var(--accent-gold,#78350f)">
                                 <strong>{{ $pmt->receipt_no }}</strong>
                                 — Rs. {{ number_format($pmt->amount_paid, 0) }}
                                 on {{ \Carbon\Carbon::parse($pmt->payment_date)->format('d-M-Y') }}
                                 ({{ $pmt->payment_method }})
                             </span>
-                            <a href="{{ route('fee-payments.edit', $pmt->id) }}" style="font-size:.75rem;font-weight:700;color:#1d4ed8;text-decoration:underline">
+                            <a href="{{ route('fee-payments.edit', $pmt->id) }}" style="font-size:.75rem;font-weight:700;color:var(--accent-primary,#1d4ed8);text-decoration:underline">
                                 Edit
                             </a>
                         </div>
@@ -174,9 +185,9 @@
         @endif
 
         @if($errors->any())
-        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px 16px;margin-bottom:16px;color:#991b1b;">
-            <strong><i class="fas fa-exclamation-triangle"></i> Please fix the following:</strong>
-            <ul style="margin:6px 0 0;padding-left:20px;">
+        <div class="alert alert-danger">
+            <strong><i class="fas fa-exclamation-triangle me-1"></i>Please fix the following:</strong>
+            <ul class="mb-0 mt-2">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
@@ -596,21 +607,19 @@
 
             </table>
 
-            <button type="submit"
-                    class="btn btn-primary">
+            <div class="d-flex gap-2 mt-2">
+                <button type="submit" class="btn-save">
+                    <i class="fas fa-save"></i> Update Voucher
+                </button>
 
-                Update Voucher
-
-            </button>
-
-            <a href="{{ route('fee-vouchers.index') }}" class="btn" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;margin-left:8px">
-                Cancel
-            </a>
+                <a href="{{ route('fee-vouchers.index') }}" class="btn btn-outline-secondary" style="border-radius:8px;">
+                    Cancel
+                </a>
+            </div>
 
         </form>
 
     </div>
-
 </div>
 
 <script>
