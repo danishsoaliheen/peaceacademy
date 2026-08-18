@@ -13,32 +13,104 @@ class ClassFeeStructureController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
+    | Sortable columns whitelist
+    |--------------------------------------------------------------------------
+    |
+    | Maps a safe "sort" key (as seen in the URL) to the actual SQL column
+    | it maps to. Never interpolate $request->sort directly into orderBy() —
+    | always go through this whitelist so an arbitrary column name can't be
+    | injected via the query string.
+    |--------------------------------------------------------------------------
+    */
+
+    private const SORTABLE_COLUMNS = [
+        'class'      => 'pa_classes.class_name',
+        'fee_type'   => 'fee_types.name',
+        'amount'     => 'class_fee_structures.amount',
+        'mandatory'  => 'class_fee_structures.is_mandatory',
+        'discount'   => 'class_fee_structures.allow_discount',
+        'status'     => 'class_fee_structures.is_active',
+    ];
+
+    // Sensible default direction the first time a column is clicked.
+    private const SORT_DEFAULT_DIRECTIONS = [
+        'class'      => 'asc',
+        'fee_type'   => 'asc',
+        'amount'     => 'desc',
+        'mandatory'  => 'desc',
+        'discount'   => 'desc',
+        'status'     => 'desc',
+    ];
+
+    /**
+     * Validate sort/direction from the request against the whitelist.
+     * An empty/invalid sort falls back to '' (no explicit column sort),
+     * which index() treats as "use the original class_id default".
+     */
+    private function resolveSort(Request $request): array
+    {
+        $sort = $request->string('sort')->toString();
+        if ($sort !== '' && !array_key_exists($sort, self::SORTABLE_COLUMNS)) {
+            $sort = '';
+        }
+
+        $direction = strtolower($request->string('direction')->toString());
+        if (!in_array($direction, ['asc', 'desc'], true)) {
+            $direction = $sort !== '' ? self::SORT_DEFAULT_DIRECTIONS[$sort] : 'asc';
+        }
+
+        return [$sort, $direction];
+    }
+
+    /**
+     * Apply the whitelisted sort to the query, with class name as a stable
+     * secondary sort so rows with equal values don't jump around between
+     * page loads.
+     */
+    private function applySort($query, string $sort, string $direction)
+    {
+        if ($sort === '') {
+            return $query->orderBy('class_fee_structures.class_id');
+        }
+
+        $query->orderBy(self::SORTABLE_COLUMNS[$sort], $direction);
+
+        if ($sort !== 'class') {
+            $query->orderBy('pa_classes.class_name', 'asc');
+        }
+
+        return $query;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | LIST
     |--------------------------------------------------------------------------
     */
 public function index(Request $request)
 {
-    $query = ClassFeeStructure::with([
-        'class',
-        'feeType'
-    ]);
+    $classFeeTable = (new ClassFeeStructure())->getTable();
+    $classTable    = (new PaClass())->getTable();
+    $feeTypeTable  = (new FeeType())->getTable();
+
+    [$sort, $direction] = $this->resolveSort($request);
+
+    $query = ClassFeeStructure::query()
+        ->join($classTable, "$classTable.id", '=', "$classFeeTable.class_id")
+        ->join($feeTypeTable, "$feeTypeTable.id", '=', "$classFeeTable.fee_type_id")
+        ->select("$classFeeTable.*")
+        ->with(['class', 'feeType']);
 
     // Search
     if ($request->filled('search')) {
 
         $search = $request->search;
 
-        $query->where(function ($q) use ($search) {
+        $query->where(function ($q) use ($search, $classTable, $feeTypeTable, $classFeeTable) {
 
-            $q->whereHas('class', function ($c) use ($search) {
-                $c->where('class_name', 'like', "%{$search}%");
-            })
-
-            ->orWhereHas('feeType', function ($f) use ($search) {
-                $f->where('name', 'like', "%{$search}%");
-            })
-
-            ->orWhere('amount', 'like', "%{$search}%");
+            $q->where("$classTable.class_name", 'like', "%{$search}%")
+              ->orWhere("$feeTypeTable.name", 'like', "%{$search}%")
+              ->orWhere("$classFeeTable.amount", 'like', "%{$search}%");
 
         });
     }
@@ -47,7 +119,7 @@ public function index(Request $request)
     if ($request->filled('class_id')) {
 
         $query->where(
-            'class_id',
+            "$classFeeTable.class_id",
             $request->class_id
         );
     }
@@ -56,7 +128,7 @@ public function index(Request $request)
     if ($request->filled('fee_type_id')) {
 
         $query->where(
-            'fee_type_id',
+            "$classFeeTable.fee_type_id",
             $request->fee_type_id
         );
     }
@@ -66,13 +138,14 @@ public function index(Request $request)
         $request->status !== '') {
 
         $query->where(
-            'is_active',
+            "$classFeeTable.is_active",
             $request->status
         );
     }
 
+    $this->applySort($query, $sort, $direction);
+
     $structures = $query
-        ->orderBy('class_id')
         ->paginate(25)
         ->withQueryString();
 
@@ -85,7 +158,9 @@ public function index(Request $request)
         compact(
             'structures',
             'classes',
-            'feeTypes'
+            'feeTypes',
+            'sort',
+            'direction'
         )
     );
 }
