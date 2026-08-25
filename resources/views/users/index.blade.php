@@ -3,7 +3,7 @@
 @section('content')
 <style>
 .users-hero { background: linear-gradient(135deg,#1e293b 0%,#334155 100%); border-radius:12px; color:#fff; padding:24px 30px; margin-bottom:22px; position:relative; overflow:hidden; }
-.users-hero::before { content:''; position:absolute; top:-55px; right:-55px; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,.05); }
+.users-hero::before { content:''; position:absolute; top:-55px; right:-55px; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,.05); pointer-events:none; }
 .users-hero h2 { font-size:1.25rem; font-weight:700; margin:0 0 4px; }
 .users-hero p { margin:0; opacity:.68; font-size:.82rem; }
 .user-stat { background:rgba(255,255,255,.1); border-radius:8px; padding:9px 16px; text-align:center; min-width:72px; }
@@ -24,11 +24,11 @@
             <h2><i class="fas fa-users-cog me-2" style="opacity:.8;"></i>User Management</h2>
             <p>Manage staff accounts, roles and access status</p>
         </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-2 flex-wrap" style="position:relative;z-index:2;">
             <div class="user-stat"><div class="num">{{ $counts['all'] }}</div><div class="lbl">Total</div></div>
             <div class="user-stat"><div class="num">{{ $counts['active'] }}</div><div class="lbl">Active</div></div>
             <div class="user-stat"><div class="num">{{ $counts['inactive'] }}</div><div class="lbl">Inactive</div></div>
-            <a href="{{ route('users.create') }}" class="btn btn-warning btn-sm" style="border-radius:8px;font-weight:600;color:#1e293b;">
+            <a href="{{ route('users.create') }}" class="btn btn-warning btn-sm" style="border-radius:8px;font-weight:600;color:#1e293b;position:relative;z-index:3;">
                 <i class="fas fa-plus me-1"></i> New User
             </a>
         </div>
