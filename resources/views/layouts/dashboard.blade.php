@@ -193,52 +193,88 @@
         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <i class="fas fa-chart-pie nav-icon"></i> Dashboard
         </a>
-        <a href="{{ route('students.index') }}" class="{{ request()->routeIs('students.*') ? 'active' : '' }}">
-            <i class="fas fa-user-graduate nav-icon"></i> Students
-        </a>
-        <a href="{{ route('enrollments.index') }}" class="{{ request()->routeIs('enrollments.*') ? 'active' : '' }}">
-            <i class="fas fa-clipboard-list nav-icon"></i> Enrollments
-        </a>
-        <a href="{{ route('classes.index') }}" class="{{ request()->routeIs('classes.*') ? 'active' : '' }}">
-            <i class="fas fa-school nav-icon"></i> Classes
-        </a>
-        <a href="{{ route('sessions.index') }}" class="{{ request()->routeIs('sessions.*') ? 'active' : '' }}">
-            <i class="fas fa-calendar-alt nav-icon"></i> Sessions
-        </a>
-        <a href="{{ route('promotion.preview') }}" class="{{ request()->routeIs('promotion.*') ? 'active' : '' }}">
-            <i class="fas fa-level-up-alt nav-icon"></i> Promotions
-        </a>
+        @can('students.view')
+    <a href="{{ route('students.index') }}" class="{{ request()->routeIs('students.*') ? 'active' : '' }}">
+        <i class="fas fa-user-graduate nav-icon"></i> Students
+    </a>
+@endcan
+       @can('enrollments.view')
+    <a href="{{ route('enrollments.index') }}" class="{{ request()->routeIs('enrollments.*') ? 'active' : '' }}">
+        <i class="fas fa-clipboard-list nav-icon"></i> Enrollments
+    </a>
+@endcan
 
+@can('classes.view')
+    <a href="{{ route('classes.index') }}" class="{{ request()->routeIs('classes.*') ? 'active' : '' }}">
+        <i class="fas fa-school nav-icon"></i> Classes
+    </a>
+@endcan
+
+@can('sessions.view')
+    <a href="{{ route('sessions.index') }}" class="{{ request()->routeIs('sessions.*') ? 'active' : '' }}">
+        <i class="fas fa-calendar-alt nav-icon"></i> Sessions
+    </a>
+@endcan
+
+@can('promotion.view')
+    <a href="{{ route('promotion.preview') }}" class="{{ request()->routeIs('promotion.*') ? 'active' : '' }}">
+        <i class="fas fa-level-up-alt nav-icon"></i> Promotions
+    </a>
+@endcan
         <div class="nav-section">Fee Management</div>
-       <a href="{{ route('fee-vouchers.index') }}" class="{{ request()->routeIs('fee-vouchers.*') ? 'active' : '' }}">
-            <i class="fas fa-file-invoice-dollar nav-icon"></i> Fee Vouchers
-        </a>
-        <a href="{{ route('fee-matrix.index') }}" class="{{ request()->routeIs('fee-matrix.*') ? 'active' : '' }}">
-            <i class="fas fa-table nav-icon"></i> Fee Matrix
-        </a>
-        <a href="{{ route('monthly-fee-generator.create') }}" class="{{ request()->routeIs('monthly-fee-generator.*') ? 'active' : '' }}">
-            <i class="fas fa-cogs nav-icon"></i> Monthly Fee Engine
-        </a>
-        <a href="{{ route('class-fee-structures.index') }}" class="{{ request()->routeIs('class-fee-structures.*') ? 'active' : '' }}">
-            <i class="fas fa-layer-group nav-icon"></i> Fee Structures
-        </a>
+       @can('fee-vouchers.view')
+    <a href="{{ route('fee-vouchers.index') }}" class="{{ request()->routeIs('fee-vouchers.*') ? 'active' : '' }}">
+        <i class="fas fa-file-invoice-dollar nav-icon"></i> Fee Vouchers
+    </a>
+@endcan
 
+@can('fee-matrix.view')
+    <a href="{{ route('fee-matrix.index') }}" class="{{ request()->routeIs('fee-matrix.*') ? 'active' : '' }}">
+        <i class="fas fa-table nav-icon"></i> Fee Matrix
+    </a>
+@endcan
+
+@can('monthly-fee-generator.view')
+    <a href="{{ route('monthly-fee-generator.create') }}" class="{{ request()->routeIs('monthly-fee-generator.*') ? 'active' : '' }}">
+        <i class="fas fa-cogs nav-icon"></i> Monthly Fee Engine
+    </a>
+@endcan
+
+@can('class-fee-structures.view')
+    <a href="{{ route('class-fee-structures.index') }}" class="{{ request()->routeIs('class-fee-structures.*') ? 'active' : '' }}">
+        <i class="fas fa-layer-group nav-icon"></i> Fee Structures
+    </a>
+@endcan
         <div class="nav-section">Accounts</div>
-        <a href="{{ route('student-ledger.index') }}" class="{{ request()->routeIs('student-ledger.*') ? 'active' : '' }}">
-            <i class="fas fa-book-open nav-icon"></i> Student Ledger
-        </a>
-        <a href="{{ route('fee-payments.index') }}" class="{{ request()->routeIs('fee-payments.*') ? 'active' : '' }}">
-            <i class="fas fa-money-bill-wave nav-icon"></i> Payment History
-        </a>
-        <a href="{{ route('previous-balances.index') }}" class="{{ request()->routeIs('previous-balances.*') ? 'active' : '' }}">
-            <i class="fas fa-exclamation-circle nav-icon"></i> Previous Balances
-        </a>
-        <a href="{{ route('monthly-ledger.index') }}" class="{{ request()->routeIs('monthly-ledger.*') ? 'active' : '' }}">
-            <i class="fas fa-book nav-icon"></i> Monthly Ledger
-        </a>
-        <a href="{{ route('expenses.index') }}" class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">
-            <i class="fas fa-receipt nav-icon"></i> Expenses
-        </a>
+       @can('student-ledger.view')
+    <a href="{{ route('student-ledger.index') }}" class="{{ request()->routeIs('student-ledger.*') ? 'active' : '' }}">
+        <i class="fas fa-book-open nav-icon"></i> Student Ledger
+    </a>
+@endcan
+
+@can('fee-payments.view')
+    <a href="{{ route('fee-payments.index') }}" class="{{ request()->routeIs('fee-payments.*') ? 'active' : '' }}">
+        <i class="fas fa-money-bill-wave nav-icon"></i> Payment History
+    </a>
+@endcan
+
+@can('previous-balances.view')
+    <a href="{{ route('previous-balances.index') }}" class="{{ request()->routeIs('previous-balances.*') ? 'active' : '' }}">
+        <i class="fas fa-exclamation-circle nav-icon"></i> Previous Balances
+    </a>
+@endcan
+
+@can('monthly-ledger.view')
+    <a href="{{ route('monthly-ledger.index') }}" class="{{ request()->routeIs('monthly-ledger.*') ? 'active' : '' }}">
+        <i class="fas fa-book nav-icon"></i> Monthly Ledger
+    </a>
+@endcan
+
+@can('expenses.view')
+    <a href="{{ route('expenses.index') }}" class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">
+        <i class="fas fa-receipt nav-icon"></i> Expenses
+    </a>
+@endcan
     </aside>
 
     <div class="main">

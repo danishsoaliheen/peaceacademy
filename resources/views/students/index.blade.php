@@ -191,18 +191,22 @@
 
             {{-- Action buttons --}}
             <div class="d-flex gap-2">
-                <a href="{{ route('students.import') }}" class="btn btn-sm btn-outline-light" style="border-radius:8px; font-weight:600;">
-                    <i class="fas fa-file-import me-1"></i> Bulk Import
-                </a>
-                <a href="{{ route('students.create') }}" class="btn btn-sm btn-warning" style="border-radius:8px; font-weight:600; color:#1e293b;">
-                    <i class="fas fa-plus me-1"></i> New Admission
-                </a>
+@can('students.import')
+    <a href="{{ route('students.import') }}">
+        <i class="fas fa-upload"></i> Import
+    </a>
+@endcan
 
-<a href="{{ route('students.export', request()->query()) }}"
-   class="btn btn-success btn-sm">
-    <i class="fas fa-file-excel"></i>
-    Export Excel
-</a>
+                @can('students.create')
+    <a href="{{ route('students.create') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> New Student
+    </a>
+@endcan
+@can('students.export')
+    <a href="{{ route('students.export') }}">
+        <i class="fas fa-download"></i> Export
+    </a>
+@endcan
 
 
 
@@ -321,7 +325,7 @@
     <div class="table-responsive">
         <table class="table tbl mb-0">
 
-            <<thead>
+            <thead>
 <tr>
 
     <th width="42">#</th>
@@ -478,22 +482,20 @@
                                    title="View Profile">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{{ route('students.edit', $student->id) }}"
-                                   class="btn btn-action"
-                                   style="background:#fef9c3; color:#854d0e; border:none;"
-                                   title="Edit">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <form action="{{ route('students.destroy', $student->id) }}"
-                                      method="POST"
-                                      onsubmit="return confirm('Delete {{ addslashes($student->student_name) }}? This cannot be undone.')">
-                                    @csrf @method('DELETE')
-                                    <button class="btn btn-action"
-                                            style="background:#fee2e2; color:#991b1b; border:none;"
-                                            title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </form>
+@can('students.edit')
+    <a href="{{ route('students.edit', $student->id) }}">
+        Edit
+    </a>
+@endcan                               @can('students.delete')
+    <form method="POST" action="{{ route('students.destroy', $student->id) }}">
+        @csrf
+        @method('DELETE')
+
+        <button type="submit">
+            Delete
+        </button>
+    </form>
+@endcan
                             </div>
                         </td>
 

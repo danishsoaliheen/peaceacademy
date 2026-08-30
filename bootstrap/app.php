@@ -11,11 +11,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+
         // Register custom middleware aliases
         $middleware->alias([
-            'auth.custom'  => \App\Http\Middleware\EnsureAuthenticated::class,
-            'role'         => \App\Http\Middleware\EnsureRole::class,
+            'auth.custom' => \App\Http\Middleware\EnsureAuthenticated::class,
+            'role' => \App\Http\Middleware\EnsureRole::class,
+            'permission' => \App\Http\Middleware\EnsurePermission::class,
         ]);
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

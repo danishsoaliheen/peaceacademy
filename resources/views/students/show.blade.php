@@ -166,10 +166,11 @@
             <i class="fas fa-file-pdf me-1"></i> Export PDF
         </button>
 
-        <a href="{{ route('students.edit', $student->id) }}" class="btn btn-warning btn-action">
-            <i class="fas fa-edit me-1"></i> Edit
-        </a>
-
+@can('students.edit')
+    <a href="{{ route('students.edit', $student->id) }}">
+        <i class="fas fa-edit"></i> Edit Student
+    </a>
+@endcan
         <a href="{{ route('students.index') }}" class="btn btn-outline-secondary btn-action">
             <i class="fas fa-arrow-left me-1"></i> Back
         </a>
@@ -598,7 +599,9 @@
             </span>
             <h6>Siblings</h6>
             <span class="ms-auto badge bg-secondary" style="font-size:.72rem;">
+            
                 Family Code: {{ $student->family_code }}
+            
             </span>
         </div>
         <div class="card-body p-0">
