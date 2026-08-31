@@ -275,6 +275,12 @@
         <i class="fas fa-receipt nav-icon"></i> Expenses
     </a>
 @endcan
+
+@can('permissions.view')
+    <a href="{{ route('permissions.index') }}" class="{{ request()->routeIs('permissions.*') ? 'active' : '' }}">
+        <i class="fas fa-shield-halved nav-icon"></i> Role Permissions
+    </a>
+@endcan
     </aside>
 
     <div class="main">

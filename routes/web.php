@@ -19,6 +19,7 @@ use App\Http\Controllers\MonthlyLedgerController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FeeMatrixController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PermissionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -114,6 +115,16 @@ Route::middleware(['auth.custom'])->group(function () {
         Route::patch('/users/{user}/toggle', [UserController::class, 'toggleStatus'])
             ->middleware('permission:users.deactivate')
             ->name('users.toggle');
+
+        
+Route::get('/permissions', [PermissionController::class, 'index'])
+    ->middleware('permission:permissions.view')
+    ->name('permissions.index');
+ 
+Route::put('/permissions', [PermissionController::class, 'update'])
+    ->middleware('permission:permissions.manage')
+    ->name('permissions.update');
+        
     });
 
 
