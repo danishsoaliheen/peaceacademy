@@ -555,15 +555,35 @@
     </a>
 
 
-    <!-- Print Button -->
+<!-- Print Button -->
 
-    <a href="{{ route('fee-vouchers.print', $voucher->id) }}"
-       target="_blank"
-       class="btn btn-dark">
+<a href="{{ route('fee-vouchers.print', $voucher->id) }}"
+   target="_blank"
+   class="btn btn-dark">
 
-        Print
+    Print
 
-    </a>
+</a>
+
+
+<!-- Save PDF Button -->
+
+<form method="POST"
+      action="{{ route('fee-vouchers.save-pdf', $voucher->id) }}"
+      style="display:inline;">
+
+    @csrf
+
+    <button type="submit"
+            class="btn"
+            style="background:#6f42c1;color:#fff;"
+            title="Generate and save this voucher as PDF">
+
+        <i class="fas fa-file-pdf"></i> Save PDF
+
+    </button>
+
+</form>
 
     <!-- Delete Button (only when no payment has ever been recorded) -->
 
