@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use App\Models\Student;
 use App\Models\PaClass;
 use App\Models\FeeType;
 use App\Models\FeeVoucher;
 use App\Models\FeeVoucherItem;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 
 class FeeVoucherController extends Controller
@@ -18,101 +20,83 @@ class FeeVoucherController extends Controller
     | LIST
     |--------------------------------------------------------------------------
     */
-public function index(Request $request)
-    
-{
-    $search        = $request->search;
-    $query         = $search;
-    $statusFilter  = $request->status;
-    $studentFilter = $request->student_id;
-    $classFilter   = $request->class_id;
-    $monthFilter   = $request->month;
-    $sortFilter    = $request->sort ?? 'latest';
 
-    $vouchers = FeeVoucher::with([
-        'student',
-        'student.enrollments.class',
-        'payments'          // needed for "Fix Method" button on paid vouchers
-    ])
+    public function index(Request $request)
+    {
+        $search        = $request->search;
+        $query         = $search;
+        $statusFilter  = $request->status;
+        $studentFilter = $request->student_id;
+        $classFilter   = $request->class_id;
+        $monthFilter   = $request->month;
+        $sortFilter    = $request->sort ?? 'latest';
 
-    ->when($search, function ($q) use ($search) {
+        $vouchers = FeeVoucher::with([
+            'student',
+            'student.enrollments.class',
+            'payments'
+        ])
 
-        $q->where(function ($sub) use ($search) {
+        ->when($search, function ($q) use ($search) {
 
-            $sub->where('voucher_no', 'like', "%{$search}%")
+            $q->where(function ($sub) use ($search) {
+                $sub->where('voucher_no', 'like', "%{$search}%")
 
-                ->orWhereHas('student', function ($sq) use ($search) {
+                    ->orWhereHas('student', function ($sq) use ($search) {
+                        $sq->where('student_name', 'like', "%{$search}%")
+                           ->orWhere('admission_no', 'like', "%{$search}%");
+                    });
+            });
 
-                    $sq->where('student_name', 'like', "%{$search}%")
-                       ->orWhere('admission_no', 'like', "%{$search}%");
+        })
 
-                });
+        ->when($statusFilter, function ($q) use ($statusFilter) {
+            $q->where('status', strtolower($statusFilter));
+        })
 
+        ->when($studentFilter, function ($q) use ($studentFilter) {
+            $q->where('student_id', $studentFilter);
+        })
+
+        ->when($classFilter, function ($q) use ($classFilter) {
+            $q->whereHas('student.enrollments', function ($enrollment) use ($classFilter) {
+                $enrollment->where('class_id', $classFilter);
+            });
+        })
+
+        ->when($monthFilter, function ($q) use ($monthFilter) {
+            $q->whereMonth('period_from', $monthFilter);
         });
 
-    })
+        // Sorting
+        if ($sortFilter == 'oldest') {
+            $vouchers->orderBy('created_at', 'asc');
+        } else {
+            $vouchers->orderBy('created_at', 'desc');
+        }
 
-    ->when($statusFilter, function ($q) use ($statusFilter) {
+        $vouchers = $vouchers->paginate(25)->withQueryString();
 
-        $q->where('status', strtolower($statusFilter));
+        $students = Student::where('is_active', 1)
+            ->orderBy('student_name')
+            ->get();
 
-    })
+        $classes = PaClass::orderBy('class_order')->get();
 
-    ->when($studentFilter, function ($q) use ($studentFilter) {
-
-        $q->where('student_id', $studentFilter);
-
-    })
-
-    ->when($classFilter, function ($q) use ($classFilter) {
-
-        $q->whereHas('student.enrollments', function ($enrollment) use ($classFilter) {
-
-            $enrollment->where('class_id', $classFilter);
-
-        });
-
-    })
-
-    ->when($monthFilter, function ($q) use ($monthFilter) {
-
-        $q->whereMonth('period_from', $monthFilter);
-
-    });
-
-    // Sorting
-
-    if ($sortFilter == 'oldest') {
-
-        $vouchers->orderBy('created_at', 'asc');
-
-    } else {
-
-        $vouchers->orderBy('created_at', 'desc');
-
+        return view('fee_vouchers.index', compact(
+            'vouchers',
+            'query',
+            'search',
+            'statusFilter',
+            'studentFilter',
+            'classFilter',
+            'monthFilter',
+            'sortFilter',
+            'students',
+            'classes'
+        ));
     }
 
-    $vouchers = $vouchers->paginate(25)->withQueryString();
-
-    $students = Student::where('is_active', 1)
-        ->orderBy('student_name')
-        ->get();
-
-    $classes = PaClass::orderBy('class_order')->get();
-
-    return view('fee_vouchers.index', compact(
-        'vouchers',
-        'query',
-        'search',
-        'statusFilter',
-        'studentFilter',
-        'classFilter',
-        'monthFilter',
-        'sortFilter',
-        'students',
-        'classes'
-    ));
-}
 
     /*
     |--------------------------------------------------------------------------
@@ -123,15 +107,17 @@ public function index(Request $request)
     public function create(Request $request)
     {
         $classes  = PaClass::orderBy('class_order')->get();
+
         $students = Student::with('enrollments.class')
             ->where('is_active', 1)
             ->orderBy('student_name')
             ->get();
+
         $feeTypes = FeeType::where('is_active', 1)->get();
 
         $preselectedStudentId   = $request->student_id;
         $preselectedPrevBalance = 0;
-        $preselectedOverdue     = [];   // plain array — safe to json_encode in Blade
+        $preselectedOverdue     = [];
 
         if ($preselectedStudentId) {
 
@@ -142,7 +128,7 @@ public function index(Request $request)
                 ->outstanding()
                 ->sum('balance_amount');
 
-            // Map to plain array HERE in the controller — avoids Blade/PHP arrow-function parse conflict
+            // Map to plain array HERE in the controller
             $preselectedOverdue = FeeVoucher::where('student_id', $preselectedStudentId)
                 ->outstanding()
                 ->orderBy('due_date')
@@ -181,6 +167,7 @@ public function index(Request $request)
         ));
     }
 
+
     /*
     |--------------------------------------------------------------------------
     | STORE
@@ -200,6 +187,7 @@ public function index(Request $request)
         $carriedForwardCount = 0;
 
         $voucher = DB::transaction(function () use ($request, &$carriedForwardCount) {
+
             $voucherNo = 'FV-' . date('YmdHis');
 
             $voucher = FeeVoucher::create([
@@ -220,10 +208,13 @@ public function index(Request $request)
             ]);
 
             if ($request->fee_type_id) {
+
                 foreach ($request->fee_type_id as $key => $feeTypeId) {
 
-                    // <input type="month"> sends "YYYY-MM"; MySQL DATE needs "YYYY-MM-DD"
+                    // <input type="month"> sends "YYYY-MM";
+                    // MySQL DATE needs "YYYY-MM-DD"
                     $monthValue = $request->month[$key] ?? null;
+
                     if ($monthValue && strlen($monthValue) === 7) {
                         $monthValue = $monthValue . '-01';
                     }
@@ -239,27 +230,13 @@ public function index(Request $request)
                 }
             }
 
+
             /*
             |------------------------------------------------------------------
-            | Previous Balance — mirrors the Monthly Fee Generator workflow,
-            | but per-voucher rather than all-or-nothing: the panel now lists
-            | EVERY unpaid/partial voucher for this student regardless of due
-            | date, with a checkbox per row, so nothing is missed just
-            | because it isn't overdue yet.
-            |
-            | The submitted voucher IDs are never trusted blindly — they're
-            | re-fetched and locked here, scoped to this student AND to
-            | outstanding() again, right before writing. That way: a voucher
-            | someone else just paid off between page-load and submit is
-            | silently dropped rather than double-charged, and a tampered ID
-            | belonging to a different student can never slip through.
-            |
-            | Every selected voucher is then closed out via
-            | markAsCarriedForwardTo(): status -> 'carried_forward' (C.F),
-            | balance_amount -> 0, notes gets this new voucher's number, and
-            | a link back to the new voucher is stored.
+            | Previous Balance
             |------------------------------------------------------------------
             */
+
             $selectedVoucherIds = collect($request->input('selected_previous_vouchers', []))
                 ->filter(fn($id) => is_numeric($id))
                 ->map(fn($id) => (int) $id)
@@ -268,12 +245,6 @@ public function index(Request $request)
 
             if ($selectedVoucherIds->isNotEmpty()) {
 
-                // No due-date cutoff — any unpaid/partial voucher is
-                // eligible. The explicit id exclusion matters here since
-                // we're not filtering by date: without it, this brand-new
-                // voucher (already saved as 'unpaid' with balance =
-                // payable_amount at this point) could match its own
-                // outstanding() query and reference itself.
                 $sourceVouchers = FeeVoucher::where('student_id', $request->student_id)
                     ->where('id', '!=', $voucher->id)
                     ->whereIn('id', $selectedVoucherIds)
@@ -289,14 +260,20 @@ public function index(Request $request)
 
                     $feeType = FeeType::firstOrCreate(
                         ['name' => 'Previous Balance'],
-                        ['category' => 'other', 'is_active' => 1, 'description' => 'Previous outstanding balance']
+                        [
+                            'category' => 'other',
+                            'is_active' => 1,
+                            'description' => 'Previous outstanding balance'
+                        ]
                     );
 
-                    $latestSource = $sourceVouchers->first(); // ordered latest due_date first, above
+                    $latestSource = $sourceVouchers->first();
 
                     $refLabel = $latestSource
                         ? ' (Ref: ' . $latestSource->voucher_no
-                            . ($sourceVouchers->count() > 1 ? ' +' . ($sourceVouchers->count() - 1) . ' more' : '')
+                            . ($sourceVouchers->count() > 1
+                                ? ' +' . ($sourceVouchers->count() - 1) . ' more'
+                                : '')
                             . ')'
                         : '';
 
@@ -312,14 +289,12 @@ public function index(Request $request)
                     $newTotal = $voucher->payable_amount + $previousBalance;
 
                     $voucher->update([
-                        'total_amount'                => $voucher->total_amount + $previousBalance,
-                        'payable_amount'               => $newTotal,
-                        'balance_amount'               => $newTotal,
-                        'previous_balance_voucher_id'  => $latestSource?->id,
+                        'total_amount'               => $voucher->total_amount + $previousBalance,
+                        'payable_amount'             => $newTotal,
+                        'balance_amount'             => $newTotal,
+                        'previous_balance_voucher_id' => $latestSource?->id,
                     ]);
 
-                    // Close out every source voucher so its balance can't be
-                    // double-counted once this new voucher exists.
                     foreach ($sourceVouchers as $sourceVoucher) {
                         $sourceVoucher->markAsCarriedForwardTo($voucher);
                     }
@@ -342,6 +317,7 @@ public function index(Request $request)
             ->with('success', $message);
     }
 
+
     /*
     |--------------------------------------------------------------------------
     | EDIT FORM
@@ -350,40 +326,56 @@ public function index(Request $request)
 
     public function edit($id)
     {
-        $voucher = FeeVoucher::with(['items', 'student', 'payments'])->findOrFail($id);
+        $voucher = FeeVoucher::with([
+            'items',
+            'student',
+            'payments'
+        ])->findOrFail($id);
 
         if (in_array($voucher->status, ['paid', 'carried_forward'], true)) {
+
             $reason = $voucher->status === 'paid'
                 ? 'This voucher is fully paid and can no longer be edited. Use "Fix Method" on that voucher to correct the payment method or reference number instead.'
-                : 'This voucher has been carried forward into voucher ' . optional($voucher->carriedForwardTo)->voucher_no . ' and can no longer be edited.';
+                : 'This voucher has been carried forward into voucher '
+                    . optional($voucher->carriedForwardTo)->voucher_no
+                    . ' and can no longer be edited.';
 
             return redirect()
                 ->route('fee-vouchers.index')
                 ->with('error', $reason);
         }
 
-        // The edit view already has a complete "locked" mode built for
-        // partially-paid vouchers (items/totals/student disabled, only
-        // period/due-date/notes editable) — it was just never given this
-        // flag, so it always rendered as if unpaid. Wiring it up here is
-        // what actually fixes editing for partial vouchers.
+        // Partial payment lock
         $hasPayments = $voucher->payments->count() > 0;
 
-        $classes  = PaClass::orderBy('class_order')->get();
+        $classes = PaClass::orderBy('class_order')->get();
+
         $students = Student::with('enrollments.class')
             ->orderBy('student_name')
             ->get();
+
         $feeTypes = FeeType::where('is_active', 1)->get();
 
-        // Build a class→feeType→unitRate lookup for JS auto-fill
+        // Build class→feeType→unitRate lookup for JS auto-fill
         $classFeeMap = \App\Models\ClassFeeStructure::where('is_active', 1)
             ->get(['class_id', 'fee_type_id', 'amount'])
             ->groupBy('class_id')
             ->map(fn($rows) => $rows->pluck('amount', 'fee_type_id'))
             ->toArray();
 
-        return view('fee_vouchers.edit', compact('voucher', 'classes', 'students', 'feeTypes', 'classFeeMap', 'hasPayments'));
+        return view(
+            'fee_vouchers.edit',
+            compact(
+                'voucher',
+                'classes',
+                'students',
+                'feeTypes',
+                'classFeeMap',
+                'hasPayments'
+            )
+        );
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -396,9 +388,12 @@ public function index(Request $request)
         $voucher = FeeVoucher::with('payments')->findOrFail($id);
 
         if (in_array($voucher->status, ['paid', 'carried_forward'], true)) {
+
             $reason = $voucher->status === 'paid'
                 ? 'This voucher is fully paid and can no longer be edited. Use "Fix Method" on that voucher to correct the payment method or reference number instead.'
-                : 'This voucher has been carried forward into voucher ' . optional($voucher->carriedForwardTo)->voucher_no . ' and can no longer be edited.';
+                : 'This voucher has been carried forward into voucher '
+                    . optional($voucher->carriedForwardTo)->voucher_no
+                    . ' and can no longer be edited.';
 
             return redirect()
                 ->route('fee-vouchers.index')
@@ -407,17 +402,16 @@ public function index(Request $request)
 
         $hasPayments = $voucher->payments->count() > 0;
 
-        // Server-side guard mirrors what the edit view already locks in the
-        // UI: once a payment has been recorded, the student, fee items,
-        // and every money field are frozen so paid/balance stays accurate.
-        // Only period, due date, and notes may change on a partial voucher.
         if ($hasPayments) {
+
             $request->validate([
                 'period_from' => 'required|date',
                 'period_to'   => 'required|date|after_or_equal:period_from',
                 'due_date'    => 'required|date',
             ]);
+
         } else {
+
             $request->validate([
                 'student_id'     => 'required|exists:students,id',
                 'period_from'    => 'required|date',
@@ -437,6 +431,7 @@ public function index(Request $request)
             ];
 
             if (!$hasPayments) {
+
                 $updateData['student_id']      = $request->student_id;
                 $updateData['total_amount']    = $request->total_amount;
                 $updateData['discount']        = $request->discount ?? 0;
@@ -446,18 +441,18 @@ public function index(Request $request)
 
             $voucher->update($updateData);
 
-            // Items are only rebuilt when nothing has been paid yet. Once a
-            // payment exists, the UI locks every item row, so there is
-            // nothing to rebuild — and doing so would risk breaking the
-            // link between what was actually paid for and the receipt.
+            // Rebuild items only when nothing has been paid yet
             if (!$hasPayments) {
+
                 FeeVoucherItem::where('voucher_id', $voucher->id)->delete();
 
                 if ($request->fee_type_id) {
+
                     foreach ($request->fee_type_id as $key => $feeTypeId) {
 
-                        // <input type="month"> sends "YYYY-MM"; MySQL DATE needs "YYYY-MM-DD"
+                        // <input type="month"> sends "YYYY-MM"
                         $monthValue = $request->month[$key] ?? null;
+
                         if ($monthValue && strlen($monthValue) === 7) {
                             $monthValue = $monthValue . '-01';
                         }
@@ -474,11 +469,7 @@ public function index(Request $request)
                 }
             }
 
-            // Single source of truth: recompute paid/balance/status from the
-            // actual payments on file, instead of blindly setting
-            // balance_amount = payable_amount (which used to silently wipe
-            // out a partial voucher's paid amount whenever it was possible
-            // to reach this code path).
+            // Recalculate paid/balance/status from actual payments
             $voucher->recalculateBalance();
         });
 
@@ -486,6 +477,7 @@ public function index(Request $request)
             ->route('fee-vouchers.index')
             ->with('success', 'Fee voucher updated successfully.');
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -495,7 +487,11 @@ public function index(Request $request)
 
     public function print($id)
     {
-        $voucher = FeeVoucher::with(['student', 'items.feeType', 'payments'])->findOrFail($id);
+        $voucher = FeeVoucher::with([
+            'student',
+            'items.feeType',
+            'payments'
+        ])->findOrFail($id);
 
         $cutoff = Carbon::now()->startOfMonth()->toDateString();
 
@@ -506,20 +502,256 @@ public function index(Request $request)
             ->where('id', '!=', $voucher->id)
             ->sum('balance_amount');
 
-        return view('fee_vouchers.print', compact('voucher', 'previousBalance'));
+        return view(
+            'fee_vouchers.print',
+            compact('voucher', 'previousBalance')
+        );
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SAVE PDF
+    |--------------------------------------------------------------------------
+    |
+    | Generates a server-side PDF and saves it automatically under:
+    |
+    | storage/app/public/fee-vouchers/
+    |     Month Year/
+    |         Class Name/
+    |             Voucher No - Student Name.pdf
+    |
+    */
+
+    public function savePdf($id)
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Load complete voucher
+        |--------------------------------------------------------------------------
+        */
+
+        $voucher = FeeVoucher::with([
+            'student',
+            'items.feeType',
+            'payments'
+        ])->findOrFail($id);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calculate previous balance
+        |--------------------------------------------------------------------------
+        |
+        | This uses the same logic as the existing Print method so that
+        | the saved PDF displays the same previous balance.
+        |
+        */
+
+        $cutoff = Carbon::now()->startOfMonth()->toDateString();
+
+        $previousBalance = FeeVoucher::where('student_id', $voucher->student_id)
+            ->outstanding()
+            ->where('due_date', '<', $cutoff)
+            ->where('balance_amount', '>', 0)
+            ->where('id', '!=', $voucher->id)
+            ->sum('balance_amount');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Determine Month Folder
+        |--------------------------------------------------------------------------
+        */
+
+        $monthFolder = Carbon::parse($voucher->period_from)
+            ->format('F Y');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Determine Class Folder
+        |--------------------------------------------------------------------------
+        */
+
+        $className = $voucher->student?->activeEnrollment?->class?->class_name
+            ?? 'Unknown Class';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Clean Folder Name
+        |--------------------------------------------------------------------------
+        |
+        | Prevent characters such as / \ : * ? " < > | from creating
+        | invalid or unwanted folder names.
+        |
+        */
+
+        $classFolder = preg_replace(
+            '/[^\pL\pN\s_-]+/u',
+            '',
+            $className
+        );
+
+        $classFolder = trim(
+            preg_replace('/\s+/', ' ', $classFolder)
+        );
+
+        if (!$classFolder) {
+            $classFolder = 'Unknown Class';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Student Name
+        |--------------------------------------------------------------------------
+        */
+
+        $studentName = $voucher->student?->student_name
+            ?? 'Student';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Clean Student Name For Filename
+        |--------------------------------------------------------------------------
+        */
+
+        $safeStudentName = preg_replace(
+            '/[^\pL\pN\s_-]+/u',
+            '',
+            $studentName
+        );
+
+        $safeStudentName = trim(
+            preg_replace('/\s+/', ' ', $safeStudentName)
+        );
+
+        if (!$safeStudentName) {
+            $safeStudentName = 'Student';
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PDF Filename
+        |--------------------------------------------------------------------------
+        */
+
+        $filename = $voucher->voucher_no
+            . ' - '
+            . $safeStudentName
+            . '.pdf';
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Complete Storage Path
+        |--------------------------------------------------------------------------
+        */
+
+        $directory = 'fee-vouchers/'
+            . $monthFolder
+            . '/'
+            . $classFolder;
+
+        $filePath = $directory . '/' . $filename;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prepare Logo For DomPDF
+        |--------------------------------------------------------------------------
+        |
+        | DomPDF works more reliably with a local image converted to
+        | Base64 rather than relying on asset() URLs.
+        |
+        */
+
+        $logoData = null;
+
+        $logoPath = public_path('images/logo.png');
+
+        if (file_exists($logoPath)) {
+
+            $logoData = 'data:image/png;base64,'
+                . base64_encode(
+                    file_get_contents($logoPath)
+                );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Generate PDF
+        |--------------------------------------------------------------------------
+        */
+
+        $pdf = Pdf::loadView(
+            'fee_vouchers.pdf',
+            compact(
+                'voucher',
+                'previousBalance',
+                'logoData'
+            )
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | A4 Page
+        |--------------------------------------------------------------------------
+        */
+
+        $pdf->setPaper('a4', 'portrait');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save PDF
+        |--------------------------------------------------------------------------
+        |
+        | Storage disk "public" points to:
+        |
+        | storage/app/public
+        |
+        */
+
+        Storage::disk('public')->put(
+            $filePath,
+            $pdf->output()
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Success Message
+        |--------------------------------------------------------------------------
+        */
+
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'PDF saved successfully: '
+                . $monthFolder
+                . ' / '
+                . $classFolder
+                . ' / '
+                . $filename
+            );
+    }
+
 
     /*
     |--------------------------------------------------------------------------
     | DESTROY
     |--------------------------------------------------------------------------
     |
-    | Used to remove duplicate / mistakenly-created vouchers. A voucher can
-    | only be deleted if NO payment has ever been recorded against it — this
-    | prevents deleting a voucher out from under a receipt/ledger entry that
-    | references it. If payments exist, the user must reverse them first
-    | from Payment History, then delete the voucher.
-    |--------------------------------------------------------------------------
+    | Used to remove duplicate / mistakenly-created vouchers.
+    | A voucher can only be deleted if NO payment has ever been recorded.
+    |
     */
 
     public function destroy($id)
@@ -527,24 +759,47 @@ public function index(Request $request)
         $voucher = FeeVoucher::withCount('payments')->findOrFail($id);
 
         if ($voucher->payments_count > 0) {
+
             return redirect()
                 ->route('fee-vouchers.index')
-                ->with('error', 'Voucher ' . $voucher->voucher_no . ' has payment(s) recorded against it and cannot be deleted. Reverse the payment(s) from Payment History first, then delete the voucher.');
+                ->with(
+                    'error',
+                    'Voucher ' . $voucher->voucher_no
+                    . ' has payment(s) recorded against it and cannot be deleted. '
+                    . 'Reverse the payment(s) from Payment History first, then delete the voucher.'
+                );
         }
 
         if ($voucher->status === 'carried_forward') {
+
             return redirect()
                 ->route('fee-vouchers.index')
-                ->with('error', 'Voucher ' . $voucher->voucher_no . ' has been carried forward into voucher ' . optional($voucher->carriedForwardTo)->voucher_no . ' and cannot be deleted, to preserve the balance history.');
+                ->with(
+                    'error',
+                    'Voucher ' . $voucher->voucher_no
+                    . ' has been carried forward into voucher '
+                    . optional($voucher->carriedForwardTo)->voucher_no
+                    . ' and cannot be deleted, to preserve the balance history.'
+                );
         }
 
         DB::transaction(function () use ($voucher) {
-            FeeVoucherItem::where('voucher_id', $voucher->id)->delete();
+
+            FeeVoucherItem::where(
+                'voucher_id',
+                $voucher->id
+            )->delete();
+
             $voucher->delete();
         });
 
         return redirect()
             ->route('fee-vouchers.index')
-            ->with('success', 'Fee Voucher ' . $voucher->voucher_no . ' deleted successfully.');
+            ->with(
+                'success',
+                'Fee Voucher '
+                . $voucher->voucher_no
+                . ' deleted successfully.'
+            );
     }
 }
