@@ -359,45 +359,42 @@ Route::put('/permissions', [PermissionController::class, 'update'])
 
 
     /*
-    |--------------------------------------------------------------------------
-    | Fee Vouchers
-    |--------------------------------------------------------------------------
-    */
+|--------------------------------------------------------------------------
+| Fee Vouchers
+|--------------------------------------------------------------------------
+*/
 
-    Route::get('/fee-vouchers', [FeeVoucherController::class, 'index'])
-        ->middleware('permission:fee-vouchers.view')
-        ->name('fee-vouchers.index');
+Route::get('/fee-vouchers', [FeeVoucherController::class, 'index'])
+    ->middleware('permission:fee-vouchers.view')
+    ->name('fee-vouchers.index');
 
-    Route::get('/fee-vouchers/create', [FeeVoucherController::class, 'create'])
-        ->middleware('permission:fee-vouchers.create')
-        ->name('fee-vouchers.create');
+Route::get('/fee-vouchers/create', [FeeVoucherController::class, 'create'])
+    ->middleware('permission:fee-vouchers.create')
+    ->name('fee-vouchers.create');
 
-    Route::post('/fee-vouchers/store', [FeeVoucherController::class, 'store'])
-        ->middleware('permission:fee-vouchers.create')
-        ->name('fee-vouchers.store');
+Route::post('/fee-vouchers/store', [FeeVoucherController::class, 'store'])
+    ->middleware('permission:fee-vouchers.create')
+    ->name('fee-vouchers.store');
 
-    Route::get('/fee-vouchers/{id}/edit', [FeeVoucherController::class, 'edit'])
-        ->middleware('permission:fee-vouchers.edit')
-        ->name('fee-vouchers.edit');
+Route::get('/fee-vouchers/{id}/edit', [FeeVoucherController::class, 'edit'])
+    ->middleware('permission:fee-vouchers.edit')
+    ->name('fee-vouchers.edit');
 
-    Route::put('/fee-vouchers/{id}', [FeeVoucherController::class, 'update'])
-        ->middleware('permission:fee-vouchers.edit')
-        ->name('fee-vouchers.update');
+Route::put('/fee-vouchers/{id}', [FeeVoucherController::class, 'update'])
+    ->middleware('permission:fee-vouchers.edit')
+    ->name('fee-vouchers.update');
 
-    Route::get('/fee-vouchers/{id}/print', [FeeVoucherController::class, 'print'])
-        ->middleware('permission:fee-vouchers.print')
-        ->name('fee-vouchers.print');
+Route::get('/fee-vouchers/{id}/print', [FeeVoucherController::class, 'print'])
+    ->middleware('permission:fee-vouchers.print')
+    ->name('fee-vouchers.print');
 
-    Route::delete('/fee-vouchers/{id}', [FeeVoucherController::class, 'destroy'])
-        ->middleware('permission:fee-vouchers.delete')
-        ->name('fee-vouchers.destroy');
-    
-    Route::post('/fee-vouchers/{id}/save-pdf', [FeeVoucherController::class, 'savePdf'])
+Route::post('/fee-vouchers/{id}/save-pdf', [FeeVoucherController::class, 'savePdf'])
     ->middleware('permission:fee-vouchers.print')
     ->name('fee-vouchers.save-pdf');
 
-        Route::post('/fee-vouchers/{id}/save-pdf', [FeeVoucherController::class, 'savePdf']
-        )->name('fee-vouchers.save-pdf');
+Route::delete('/fee-vouchers/{id}', [FeeVoucherController::class, 'destroy'])
+    ->middleware('permission:fee-vouchers.delete')
+    ->name('fee-vouchers.destroy');
     /*
     |--------------------------------------------------------------------------
     | Student Ledger
