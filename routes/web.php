@@ -391,7 +391,8 @@ Route::put('/permissions', [PermissionController::class, 'update'])
     Route::delete('/fee-vouchers/{id}', [FeeVoucherController::class, 'destroy'])
         ->middleware('permission:fee-vouchers.delete')
         ->name('fee-vouchers.destroy');
-
+    
+    Route('fee-vouchers.save-pdf', $voucher->id)
 
     /*
     |--------------------------------------------------------------------------
