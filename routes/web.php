@@ -392,8 +392,12 @@ Route::put('/permissions', [PermissionController::class, 'update'])
         ->middleware('permission:fee-vouchers.delete')
         ->name('fee-vouchers.destroy');
     
-    Route('fee-vouchers.save-pdf', $voucher->id)
+    Route::post('/fee-vouchers/{id}/save-pdf', [FeeVoucherController::class, 'savePdf'])
+    ->middleware('permission:fee-vouchers.print')
+    ->name('fee-vouchers.save-pdf');
 
+        Route::post('/fee-vouchers/{id}/save-pdf', [FeeVoucherController::class, 'savePdf']
+        )->name('fee-vouchers.save-pdf');
     /*
     |--------------------------------------------------------------------------
     | Student Ledger
