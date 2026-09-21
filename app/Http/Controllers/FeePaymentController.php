@@ -16,10 +16,6 @@ class FeePaymentController extends Controller
     |--------------------------------------------------------------------------
     | Sortable columns whitelist
     |--------------------------------------------------------------------------
-    | Table names are explicit (fee_payments./students./fee_vouchers.) because
-    | the index/export queries left-join students and fee_vouchers to allow
-    | sorting by student name / voucher number.
-    |--------------------------------------------------------------------------
     */
 
     private const SORTABLE_COLUMNS = [
@@ -44,14 +40,24 @@ class FeePaymentController extends Controller
         'received_by'    => 'asc',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve sorting
+    |--------------------------------------------------------------------------
+    */
+
     private function resolveSort(Request $request): array
     {
         $sort = $request->string('sort')->toString();
+
         if ($sort === '' || !array_key_exists($sort, self::SORTABLE_COLUMNS)) {
             $sort = 'payment_date';
         }
 
-        $direction = strtolower($request->string('direction')->toString());
+        $direction = strtolower(
+            $request->string('direction')->toString()
+        );
+
         if (!in_array($direction, ['asc', 'desc'], true)) {
             $direction = self::SORT_DEFAULT_DIRECTIONS[$sort];
         }
@@ -59,16 +65,18 @@ class FeePaymentController extends Controller
         return [$sort, $direction];
     }
 
-    /**
-     * Shared filtered + joined query for index() and export().
-     *
-     * Date range defaults to the CURRENT MONTH unless the user explicitly
-     * supplied from_date / to_date — this is the new default behaviour
-     * requested (previously it showed all-time history with no default
-     * window at all).
-     *
-     * Returns [query, fromDate, toDate] so both callers stay in sync.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | Shared filtered + joined query
+    |--------------------------------------------------------------------------
+    |
+    | Used by both index() and export().
+    |
+    | Family Code filtering intentionally does NOT use is_active.
+    | Historical payments for inactive students remain available.
+    |--------------------------------------------------------------------------
+    */
+
     private function buildFilteredQuery(Request $request): array
     {
         $fromDate = $request->filled('from_date')
@@ -80,18 +88,66 @@ class FeePaymentController extends Controller
             : now()->endOfMonth()->format('Y-m-d');
 
         $query = FeePayment::query()
-            ->leftJoin('students', 'students.id', '=', 'fee_payments.student_id')
-            ->leftJoin('fee_vouchers', 'fee_vouchers.id', '=', 'fee_payments.voucher_id')
+            ->leftJoin(
+                'students',
+                'students.id',
+                '=',
+                'fee_payments.student_id'
+            )
+            ->leftJoin(
+                'fee_vouchers',
+                'fee_vouchers.id',
+                '=',
+                'fee_payments.voucher_id'
+            )
             ->select('fee_payments.*')
             ->with(['student', 'voucher'])
-            ->whereBetween('fee_payments.payment_date', [$fromDate, $toDate]);
+            ->whereBetween(
+                'fee_payments.payment_date',
+                [$fromDate, $toDate]
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Student filter
+        |--------------------------------------------------------------------------
+        |
+        | No is_active restriction here.
+        | Historical payments for inactive students remain accessible.
+        |
+        */
 
         if ($request->filled('student_id')) {
-            $query->where('fee_payments.student_id', $request->student_id);
+            $query->where(
+                'fee_payments.student_id',
+                $request->student_id
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Family Code filter
+        |--------------------------------------------------------------------------
+        |
+        | This deliberately includes ACTIVE and INACTIVE students.
+        |
+        */
+
+        if ($request->filled('family_code')) {
+            $query->where(
+                'students.family_code',
+                $request->family_code
+            );
         }
 
         return [$query, $fromDate, $toDate];
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Apply sorting
+    |--------------------------------------------------------------------------
+    */
 
     private function applySort($query, string $sort, string $direction)
     {
@@ -99,12 +155,20 @@ class FeePaymentController extends Controller
 
         $query->orderBy($column, $direction);
 
-        // Stable secondary sort so rows with equal values (e.g. same date)
-        // don't jump around between page loads.
+        /*
+        | Stable secondary sort.
+        */
         if ($sort !== 'payment_date') {
-            $query->orderBy('fee_payments.payment_date', 'desc');
+            $query->orderBy(
+                'fee_payments.payment_date',
+                'desc'
+            );
         }
-        $query->orderBy('fee_payments.id', 'desc');
+
+        $query->orderBy(
+            'fee_payments.id',
+            'desc'
+        );
 
         return $query;
     }
@@ -117,11 +181,18 @@ class FeePaymentController extends Controller
 
     public function create(FeeVoucher $voucher)
     {
-        $voucher->load(['student', 'items.feeType', 'payments']);
+        $voucher->load([
+            'student',
+            'items.feeType',
+            'payments'
+        ]);
 
         $paymentMethods = PaymentMethodHelper::enabled();
 
-        return view('fee_payments.create', compact('voucher', 'paymentMethods'));
+        return view(
+            'fee_payments.create',
+            compact('voucher', 'paymentMethods')
+        );
     }
 
     /*
@@ -140,7 +211,9 @@ class FeePaymentController extends Controller
         ]);
 
         $payment = DB::transaction(function () use ($request) {
-            $voucher = FeeVoucher::lockForUpdate()->findOrFail($request->voucher_id);
+
+            $voucher = FeeVoucher::lockForUpdate()
+                ->findOrFail($request->voucher_id);
 
             $receiptNo = FeeVoucher::nextReceiptNo();
 
@@ -152,7 +225,9 @@ class FeePaymentController extends Controller
                 'payment_date'   => $request->payment_date,
                 'payment_method' => $request->payment_method ?? 'Cash',
                 'reference_no'   => $request->reference_no,
-                'received_by'    => auth()->check() ? auth()->user()->name : 'Admin',
+                'received_by'    => auth()->check()
+                    ? auth()->user()->name
+                    : 'Admin',
                 'notes'          => $request->notes,
             ]);
         });
@@ -160,84 +235,399 @@ class FeePaymentController extends Controller
         $payment->voucher->recalculateBalance();
 
         if ($request->has('print_receipt')) {
-            return redirect()->route('fee-payments.receipt', $payment->id);
+            return redirect()->route(
+                'fee-payments.receipt',
+                $payment->id
+            );
         }
 
         return redirect()
             ->route('fee-vouchers.index')
-            ->with('success', "Payment of Rs. " . number_format($request->amount_paid, 0) . " recorded. Receipt: {$payment->receipt_no}");
+            ->with(
+                'success',
+                "Payment of Rs. " .
+                number_format($request->amount_paid, 0) .
+                " recorded. Receipt: {$payment->receipt_no}"
+            );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Payment History (all payments) — defaults to current month
+    | Payment History
     |--------------------------------------------------------------------------
     */
 
     public function index(Request $request)
     {
-        [$sort, $direction]        = $this->resolveSort($request);
-        [$query, $fromDate, $toDate] = $this->buildFilteredQuery($request);
+        [$sort, $direction] =
+            $this->resolveSort($request);
 
-        // Total for the header card must reflect the FULL filtered set,
-        // not just the current page — clone before pagination.
-        $totalReceived = (clone $query)->sum('fee_payments.amount_paid');
+        [$query, $fromDate, $toDate] =
+            $this->buildFilteredQuery($request);
 
-        $this->applySort($query, $sort, $direction);
+        /*
+        |--------------------------------------------------------------------------
+        | Total received from the complete filtered result
+        |--------------------------------------------------------------------------
+        */
 
-        $payments = $query->paginate(30)->withQueryString();
+        $totalReceived =
+            (clone $query)->sum(
+                'fee_payments.amount_paid'
+            );
 
-        $students = Student::where('is_active', 1)
+        $this->applySort(
+            $query,
+            $sort,
+            $direction
+        );
+
+        $payments =
+            $query
+                ->paginate(30)
+                ->withQueryString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Student dropdown
+        |--------------------------------------------------------------------------
+        |
+        | Show ACTIVE + INACTIVE students.
+        | Inactive students are clearly marked.
+        |
+        */
+
+        $students = Student::query()
             ->orderBy('student_name')
-            ->get(['id', 'student_name', 'admission_no']);
+            ->get([
+                'id',
+                'student_name',
+                'admission_no',
+                'family_code',
+                'is_active',
+            ]);
 
-        return view('fee_payments.index', compact(
-            'payments', 'totalReceived', 'students',
-            'sort', 'direction', 'fromDate', 'toDate'
-        ));
+        /*
+        |--------------------------------------------------------------------------
+        | Family Code dropdown
+        |--------------------------------------------------------------------------
+        |
+        | Unique family codes only.
+        | Inactive students are included.
+        |
+        */
+
+        $familyCodes = Student::query()
+            ->whereNotNull('family_code')
+            ->where('family_code', '!=', '')
+            ->select('family_code')
+            ->distinct()
+            ->orderBy('family_code')
+            ->pluck('family_code');
+
+        return view(
+            'fee_payments.index',
+            compact(
+                'payments',
+                'totalReceived',
+                'students',
+                'familyCodes',
+                'sort',
+                'direction',
+                'fromDate',
+                'toDate'
+            )
+        );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Export — same filters/sort as index(), no pagination.
-    | Streams an HTML table with .xls headers (opens directly in Excel),
-    | same lightweight approach as student_ledger/export.blade.php.
+    | Export Payment History as CSV
+    |--------------------------------------------------------------------------
+    |
+    | Exports the same filtered payment history shown on the screen.
+    | Includes ACTIVE + INACTIVE students.
+    |
     |--------------------------------------------------------------------------
     */
 
     public function export(Request $request)
     {
-        [$sort, $direction]          = $this->resolveSort($request);
-        [$query, $fromDate, $toDate] = $this->buildFilteredQuery($request);
+        [$sort, $direction] =
+            $this->resolveSort($request);
 
-        $this->applySort($query, $sort, $direction);
+        [$query, $fromDate, $toDate] =
+            $this->buildFilteredQuery($request);
 
-        $payments      = $query->get();
-        $totalReceived = $payments->sum('amount_paid');
+        $this->applySort(
+            $query,
+            $sort,
+            $direction
+        );
 
-        $filename = 'payment-history_' . date('Y-m-d_His') . '.xls';
+        $payments = $query->get();
 
-        return response()
-            ->view('fee_payments.export', compact('payments', 'totalReceived', 'fromDate', 'toDate'))
-            ->header('Content-Type', 'application/vnd.ms-excel; charset=utf-8')
-            ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+        $totalReceived =
+            $payments->sum('amount_paid');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Selected Family Code
+        |--------------------------------------------------------------------------
+        */
+
+        $familyCode = $request->filled('family_code')
+            ? $request->family_code
+            : null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | CSV filename
+        |--------------------------------------------------------------------------
+        */
+
+        $filename = 'payment-history';
+
+        if ($familyCode) {
+            $filename .= '-family-' .
+                preg_replace(
+                    '/[^A-Za-z0-9_-]/',
+                    '-',
+                    $familyCode
+                );
+        }
+
+        $filename .= '-' .
+            date('Y-m-d_His') .
+            '.csv';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Generate CSV
+        |--------------------------------------------------------------------------
+        */
+
+        return response()->streamDownload(
+            function () use (
+                $payments,
+                $totalReceived,
+                $fromDate,
+                $toDate,
+                $familyCode
+            ) {
+
+                $handle = fopen(
+                    'php://output',
+                    'w'
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | UTF-8 BOM
+                |--------------------------------------------------------------------------
+                |
+                | Helps Microsoft Excel correctly read UTF-8
+                | characters, including Urdu/special characters.
+                |
+                */
+
+                fwrite(
+                    $handle,
+                    "\xEF\xBB\xBF"
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Report heading
+                |--------------------------------------------------------------------------
+                */
+
+                fputcsv(
+                    $handle,
+                    ['Peace Academy - Payment History']
+                );
+
+                fputcsv(
+                    $handle,
+                    [
+                        'Payment Period',
+                        $fromDate . ' to ' . $toDate
+                    ]
+                );
+
+                if ($familyCode) {
+                    fputcsv(
+                        $handle,
+                        [
+                            'Family Code',
+                            $familyCode
+                        ]
+                    );
+
+                    fputcsv(
+                        $handle,
+                        [
+                            'Note',
+                            'Includes active and inactive students'
+                        ]
+                    );
+                }
+
+                fputcsv(
+                    $handle,
+                    []
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Column headings
+                |--------------------------------------------------------------------------
+                */
+
+                fputcsv(
+                    $handle,
+                    [
+                        'Sr#',
+                        'Receipt No',
+                        'Student',
+                        'Family Code',
+                        'Admission No',
+                        'Voucher No',
+                        'Amount Paid (Rs.)',
+                        'Payment Date',
+                        'Payment Method',
+                        'Received By',
+                    ]
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Payment rows
+                |--------------------------------------------------------------------------
+                */
+
+                foreach (
+                    $payments as $index => $payment
+                ) {
+
+                    $student =
+                        $payment->student;
+
+                    $studentName =
+                        $student?->student_name
+                        ?? 'Unknown Student';
+
+                    /*
+                    | Mark inactive students clearly.
+                    */
+
+                    if (
+                        $student &&
+                        !$student->is_active
+                    ) {
+                        $studentName .=
+                            ' (Inactive)';
+                    }
+
+                    fputcsv(
+                        $handle,
+                        [
+                            $index + 1,
+                            $payment->receipt_no,
+                            $studentName,
+                            $student?->family_code ?? '',
+                            $student?->admission_no ?? '',
+                            $payment->voucher?->voucher_no ?? '',
+                            number_format(
+                                (float) $payment->amount_paid,
+                                2,
+                                '.',
+                                ''
+                            ),
+                            $payment->payment_date,
+                            $payment->payment_method,
+                            $payment->received_by,
+                        ]
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Total row
+                |--------------------------------------------------------------------------
+                */
+
+                fputcsv(
+                    $handle,
+                    []
+                );
+
+                fputcsv(
+                    $handle,
+                    [
+                        '',
+                        '',
+                        'TOTAL RECEIVED',
+                        '',
+                        '',
+                        '',
+                        number_format(
+                            (float) $totalReceived,
+                            2,
+                            '.',
+                            ''
+                        ),
+                        '',
+                        '',
+                        '',
+                    ]
+                );
+
+                fclose($handle);
+            },
+            $filename,
+            [
+                'Content-Type' =>
+                    'text/csv; charset=UTF-8',
+
+                'Cache-Control' =>
+                    'no-store, no-cache',
+            ]
+        );
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Edit Payment (correct a wrong amount / method / date)
+    | Edit Payment
     |--------------------------------------------------------------------------
     */
 
     public function edit($id)
     {
-        $payment = FeePayment::with(['student', 'voucher'])->findOrFail($id);
+        $payment =
+            FeePayment::with([
+                'student',
+                'voucher'
+            ])->findOrFail($id);
 
-        $paymentMethods = PaymentMethodHelper::enabled();
+        $paymentMethods =
+            PaymentMethodHelper::enabled();
 
-        $methodOnlyMode = in_array($payment->voucher->status, ['paid', 'carried_forward'], true);
+        $methodOnlyMode =
+            in_array(
+                $payment->voucher->status,
+                ['paid', 'carried_forward'],
+                true
+            );
 
-        return view('fee_payments.edit', compact('payment', 'paymentMethods', 'methodOnlyMode'));
+        return view(
+            'fee_payments.edit',
+            compact(
+                'payment',
+                'paymentMethods',
+                'methodOnlyMode'
+            )
+        );
     }
 
     /*
@@ -248,67 +638,118 @@ class FeePaymentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $payment = FeePayment::findOrFail($id);
-        $voucher = FeeVoucher::findOrFail($payment->voucher_id);
+        $payment =
+            FeePayment::findOrFail($id);
 
-        $methodOnlyMode = in_array($voucher->status, ['paid', 'carried_forward'], true);
+        $voucher =
+            FeeVoucher::findOrFail(
+                $payment->voucher_id
+            );
+
+        $methodOnlyMode =
+            in_array(
+                $voucher->status,
+                ['paid', 'carried_forward'],
+                true
+            );
 
         if ($methodOnlyMode) {
+
             $request->validate([
-                'payment_method' => 'required|string',
+                'payment_method' =>
+                    'required|string',
             ]);
 
             $payment->update([
-                'payment_method' => $request->payment_method,
-                'reference_no'   => $request->reference_no,
-                'notes'          => $request->notes,
+                'payment_method' =>
+                    $request->payment_method,
+
+                'reference_no' =>
+                    $request->reference_no,
+
+                'notes' =>
+                    $request->notes,
             ]);
 
             return redirect()
                 ->back()
-                ->with('success', 'Payment method updated successfully.');
+                ->with(
+                    'success',
+                    'Payment method updated successfully.'
+                );
         }
 
         $request->validate([
-            'payment_date' => 'required|date|before_or_equal:today',
-            'amount_paid'  => 'required|numeric|min:1',
+            'payment_date' =>
+                'required|date|before_or_equal:today',
+
+            'amount_paid' =>
+                'required|numeric|min:1',
         ]);
 
-        DB::transaction(function () use ($payment, $request) {
-            $payment->update([
-                'amount_paid'    => $request->amount_paid,
-                'payment_date'   => $request->payment_date,
-                'payment_method' => $request->payment_method ?? $payment->payment_method,
-                'reference_no'   => $request->reference_no,
-                'notes'          => $request->notes,
-            ]);
+        DB::transaction(
+            function () use (
+                $payment,
+                $request
+            ) {
 
-            $payment->voucher->recalculateBalance();
-        });
+                $payment->update([
+                    'amount_paid' =>
+                        $request->amount_paid,
+
+                    'payment_date' =>
+                        $request->payment_date,
+
+                    'payment_method' =>
+                        $request->payment_method
+                            ?? $payment->payment_method,
+
+                    'reference_no' =>
+                        $request->reference_no,
+
+                    'notes' =>
+                        $request->notes,
+                ]);
+
+                $payment->voucher
+                    ->recalculateBalance();
+            }
+        );
 
         return redirect()
             ->route('fee-vouchers.index')
-            ->with('success', 'Payment updated. Voucher balance recalculated.');
+            ->with(
+                'success',
+                'Payment updated. Voucher balance recalculated.'
+            );
     }
 
     /*
     |--------------------------------------------------------------------------
     | Print / Download Receipt
     |--------------------------------------------------------------------------
-    | ?download=1 switches the view from auto-print to auto-download-as-PDF
-    | (via html2pdf.js, same library already used on the student profile
-    | page). This is the "Send" action from the payment history list — for
-    | now it just saves the PDF locally; once WhatsApp is wired up this same
-    | generated file becomes what gets sent to the student's WhatsApp number.
-    |--------------------------------------------------------------------------
     */
 
-    public function receipt(Request $request, $id)
-    {
-        $payment  = FeePayment::with(['student', 'voucher.items.feeType'])->findOrFail($id);
-        $download = $request->boolean('download');
+    public function receipt(
+        Request $request,
+        $id
+    ) {
+        $payment =
+            FeePayment::with([
+                'student',
+                'voucher.items.feeType'
+            ])->findOrFail($id);
 
-        return view('fee_payments.receipt', compact('payment', 'download'));
+        $download =
+            $request->boolean('download');
+
+        return view(
+            'fee_payments.receipt',
+            compact(
+                'payment',
+                'download'
+            )
+        );
     }
 
     /*
@@ -319,14 +760,28 @@ class FeePaymentController extends Controller
 
     public function destroy($id)
     {
-        $payment = FeePayment::findOrFail($id);
+        $payment =
+            FeePayment::findOrFail($id);
 
-        DB::transaction(function () use ($payment) {
-            $voucherId = $payment->voucher_id;
-            $payment->delete();
-            FeeVoucher::findOrFail($voucherId)->recalculateBalance();
-        });
+        DB::transaction(
+            function () use ($payment) {
 
-        return redirect()->back()->with('success', 'Payment reversed successfully.');
+                $voucherId =
+                    $payment->voucher_id;
+
+                $payment->delete();
+
+                FeeVoucher::findOrFail(
+                    $voucherId
+                )->recalculateBalance();
+            }
+        );
+
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'Payment reversed successfully.'
+            );
     }
 }

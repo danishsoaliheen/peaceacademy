@@ -2,8 +2,11 @@
 
 @section('content')
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <style>
 
@@ -49,7 +52,9 @@
         background:#f0f0f0;
     }
 
-    th.sortable{ padding:0; }
+    th.sortable{
+        padding:0;
+    }
 
     .sort-link{
         display:flex;
@@ -60,10 +65,24 @@
         text-decoration:none;
         white-space:nowrap;
     }
-    .sort-link:hover{ color:#0d6efd; }
-    .sort-link .sort-icon{ font-size:10px; opacity:.4; }
-    .sort-link.active{ color:#0d6efd; font-weight:700; }
-    .sort-link.active .sort-icon{ opacity:1; }
+
+    .sort-link:hover{
+        color:#0d6efd;
+    }
+
+    .sort-link .sort-icon{
+        font-size:10px;
+        opacity:.4;
+    }
+
+    .sort-link.active{
+        color:#0d6efd;
+        font-weight:700;
+    }
+
+    .sort-link.active .sort-icon{
+        opacity:1;
+    }
 
     .text-end{
         text-align:right;
@@ -81,15 +100,27 @@
         cursor:pointer;
     }
 
-    .btn-primary{ background:#0d6efd; }
-    .btn-success{ background:#198754; }
-    .btn-dark{ background:#212529; }
-    .btn-danger{ background:#dc3545; }
+    .btn-primary{
+        background:#0d6efd;
+    }
+
+    .btn-success{
+        background:#198754;
+    }
+
+    .btn-dark{
+        background:#212529;
+    }
+
+    .btn-danger{
+        background:#dc3545;
+    }
 
     .summary-box{
         display:flex;
         gap:15px;
         margin-bottom:20px;
+        flex-wrap:wrap;
     }
 
     .summary-card{
@@ -99,6 +130,7 @@
         box-shadow:0 0 10px rgba(0,0,0,0.05);
         text-align:center;
         flex:1;
+        min-width:220px;
     }
 
     .summary-card .label{
@@ -112,17 +144,52 @@
         font-weight:bold;
     }
 
-    .text-green{ color:#198754; }
-    .text-muted{ color:#6c757d; }
+    .text-green{
+        color:#198754;
+    }
 
-    .rcpt-link, .vno-link{
+    .text-muted{
+        color:#6c757d;
+    }
+
+    .rcpt-link,
+    .vno-link{
         font-family:monospace;
         font-size:13px;
         color:#0d6efd;
         text-decoration:none;
         font-weight:700;
     }
-    .rcpt-link:hover, .vno-link:hover{ text-decoration:underline; }
+
+    .rcpt-link:hover,
+    .vno-link:hover{
+        text-decoration:underline;
+    }
+
+    .inactive-student{
+        color:#888;
+        font-style:italic;
+    }
+
+    .family-badge{
+        display:inline-block;
+        padding:3px 7px;
+        background:#e9ecef;
+        border-radius:4px;
+        font-family:monospace;
+        font-size:12px;
+        font-weight:600;
+    }
+
+    .active-filter{
+        margin-bottom:15px;
+        padding:10px 14px;
+        background:#e7f1ff;
+        border:1px solid #b6d4fe;
+        border-radius:6px;
+        color:#084298;
+        font-size:14px;
+    }
 
 </style>
 
@@ -141,11 +208,13 @@
         <a href="{{ route('fee-vouchers.index') }}"
            class="btn btn-primary">
 
-            <i class="fas fa-arrow-left"></i> Back to Vouchers
+            <i class="fas fa-arrow-left"></i>
+            Back to Vouchers
 
         </a>
 
     </div>
+
 
     <!-- ===================================================== -->
     <!-- Summary Cards -->
@@ -154,20 +223,152 @@
     <div class="summary-box">
 
         <div class="summary-card">
-            <div class="label">Total Received ({{ \Carbon\Carbon::parse($fromDate)->format('d M Y') }} – {{ \Carbon\Carbon::parse($toDate)->format('d M Y') }})</div>
+
+            <div class="label">
+                Total Received
+                ({{ \Carbon\Carbon::parse($fromDate)->format('d M Y') }}
+                –
+                {{ \Carbon\Carbon::parse($toDate)->format('d M Y') }})
+            </div>
+
             <div class="value text-green">
                 Rs. {{ number_format($totalReceived, 0) }}
             </div>
+
         </div>
 
+
         <div class="summary-card">
-            <div class="label">Total Payments</div>
+
+            <div class="label">
+                Total Payments
+            </div>
+
             <div class="value">
                 {{ $payments->total() }}
             </div>
+
         </div>
 
+
+        @if(request('family_code'))
+
+            <div class="summary-card">
+
+                <div class="label">
+                    Family Code
+                </div>
+
+                <div class="value">
+                    {{ request('family_code') }}
+                </div>
+
+            </div>
+
+        @elseif(request('student_id'))
+
+            @php
+                $selectedStudentForSummary =
+                    $students->firstWhere(
+                        'id',
+                        request('student_id')
+                    );
+            @endphp
+
+            @if($selectedStudentForSummary)
+
+                <div class="summary-card">
+
+                    <div class="label">
+                        Student
+                    </div>
+
+                    <div class="value"
+                         style="font-size:16px;">
+
+                        {{ strtoupper($selectedStudentForSummary->student_name) }}
+
+                    </div>
+
+                </div>
+
+            @endif
+
+        @endif
+
     </div>
+
+
+    <!-- ===================================================== -->
+    <!-- Active Filter Information -->
+    <!-- ===================================================== -->
+
+    @if(request('family_code'))
+
+        <div class="active-filter">
+
+            <i class="fas fa-users"></i>
+
+            Showing payment history for family:
+
+            <strong>
+                {{ request('family_code') }}
+            </strong>
+
+            <span class="text-muted">
+                — includes active and inactive students.
+            </span>
+
+        </div>
+
+    @elseif(request('student_id'))
+
+        @php
+            $selectedStudent =
+                $students->firstWhere(
+                    'id',
+                    request('student_id')
+                );
+        @endphp
+
+        @if($selectedStudent)
+
+            <div class="active-filter">
+
+                <i class="fas fa-user"></i>
+
+                Showing payment history for:
+
+                <strong>
+                    {{ strtoupper($selectedStudent->student_name) }}
+                </strong>
+
+                @if(!$selectedStudent->is_active)
+
+                    <span class="inactive-student">
+                        (Inactive)
+                    </span>
+
+                @endif
+
+                @if($selectedStudent->family_code)
+
+                    <span class="text-muted">
+                        — Family:
+                    </span>
+
+                    <strong>
+                        {{ $selectedStudent->family_code }}
+                    </strong>
+
+                @endif
+
+            </div>
+
+        @endif
+
+    @endif
+
 
     <!-- ===================================================== -->
     <!-- Filter Form -->
@@ -175,65 +376,191 @@
 
     <div class="table-container">
 
-        <form method="GET" class="row g-2 mb-3" id="filterForm">
+        <form method="GET"
+              class="row g-2 mb-3"
+              id="filterForm">
+
+
+            <!-- Student -->
 
             <div class="col-md-3">
-                <select name="student_id" class="form-select">
-                    <option value="">All Students</option>
+
+                <label class="form-label mb-1">
+                    Student
+                </label>
+
+                <select name="student_id"
+                        class="form-select">
+
+                    <option value="">
+                        All Students
+                    </option>
+
                     @foreach($students as $student)
+
                         <option value="{{ $student->id }}"
                             {{ request('student_id') == $student->id ? 'selected' : '' }}>
+
                             {{ strtoupper($student->student_name) }}
+
+                            @if(!$student->is_active)
+                                (Inactive)
+                            @endif
+
+                            @if($student->family_code)
+                                — {{ $student->family_code }}
+                            @endif
+
                         </option>
+
                     @endforeach
+
                 </select>
+
             </div>
 
+
+            <!-- Family Code -->
+
+            <div class="col-md-3">
+
+                <label class="form-label mb-1">
+                    Family Code
+                </label>
+
+                <select name="family_code"
+                        class="form-select">
+
+                    <option value="">
+                        All Families
+                    </option>
+
+                    @foreach($familyCodes as $familyCode)
+
+                        <option value="{{ $familyCode }}"
+                            {{ request('family_code') == $familyCode ? 'selected' : '' }}>
+
+                            {{ $familyCode }}
+
+                        </option>
+
+                    @endforeach
+
+                </select>
+
+            </div>
+
+
+            <!-- From Date -->
+
             <div class="col-md-2">
+
+                <label class="form-label mb-1">
+                    From
+                </label>
+
                 <input type="date"
                        name="from_date"
                        class="form-control"
                        value="{{ $fromDate }}">
+
             </div>
 
+
+            <!-- To Date -->
+
             <div class="col-md-2">
+
+                <label class="form-label mb-1">
+                    To
+                </label>
+
                 <input type="date"
                        name="to_date"
                        class="form-control"
                        value="{{ $toDate }}">
+
             </div>
 
-            {{-- Carry current sort along with filter submissions --}}
-            <input type="hidden" name="sort" value="{{ $sort }}">
-            <input type="hidden" name="direction" value="{{ $direction }}">
+
+            <!-- Carry current sort -->
+
+            <input type="hidden"
+                   name="sort"
+                   value="{{ $sort }}">
+
+            <input type="hidden"
+                   name="direction"
+                   value="{{ $direction }}">
+
+
+            <!-- Reset -->
 
             <div class="col-md-2">
+
+                <label class="form-label mb-1">
+                    &nbsp;
+                </label>
+
                 <a href="{{ route('fee-payments.index') }}"
                    class="btn btn-danger w-100"
-                   style="display:inline-flex;align-items:center;justify-content:center;padding:8px;">
-                    <i class="fas fa-times"></i> Reset (This Month)
+                   style="display:inline-flex;
+                          align-items:center;
+                          justify-content:center;
+                          padding:8px;">
+
+                    <i class="fas fa-times"></i>
+                    &nbsp; Reset
+
                 </a>
+
             </div>
 
+
+            <!-- Go -->
+
             <div class="col-md-1">
+
+                <label class="form-label mb-1">
+                    &nbsp;
+                </label>
+
                 <button class="btn btn-primary w-100">
                     Go
                 </button>
+
             </div>
 
+
+            <!-- Export -->
+
             <div class="col-md-2">
+
+                <label class="form-label mb-1">
+                    &nbsp;
+                </label>
+
                 <a href="{{ route('fee-payments.export', request()->query()) }}"
                    class="btn btn-success w-100"
-                   style="display:inline-flex;align-items:center;justify-content:center;padding:8px;">
-                    <i class="fas fa-file-excel"></i> Export
+                   style="display:inline-flex;
+                          align-items:center;
+                          justify-content:center;
+                          padding:8px;">
+
+                    <i class="fas fa-file-excel"></i>
+                    &nbsp; Export
+
                 </a>
+
             </div>
 
         </form>
 
+
         @php
-            // Column-specific default direction the first time it's clicked.
+
             $sortDefaultDirections = [
+
                 'id'             => 'desc',
                 'receipt_no'     => 'desc',
                 'student'        => 'asc',
@@ -242,26 +569,71 @@
                 'payment_date'   => 'desc',
                 'payment_method' => 'asc',
                 'received_by'    => 'asc',
+
             ];
 
-            $buildSortUrl = function (string $column) use ($sort, $direction, $sortDefaultDirections) {
-                $newDirection = $sort === $column
-                    ? ($direction === 'asc' ? 'desc' : 'asc')
-                    : $sortDefaultDirections[$column];
+
+            $buildSortUrl = function (
+                string $column
+            ) use (
+                $sort,
+                $direction,
+                $sortDefaultDirections
+            ) {
+
+                $newDirection =
+                    $sort === $column
+
+                        ? (
+                            $direction === 'asc'
+                                ? 'desc'
+                                : 'asc'
+                        )
+
+                        : $sortDefaultDirections[$column];
+
 
                 $params = array_merge(
+
                     request()->except('page'),
-                    ['sort' => $column, 'direction' => $newDirection]
+
+                    [
+                        'sort' =>
+                            $column,
+
+                        'direction' =>
+                            $newDirection
+                    ]
+
                 );
 
-                return request()->url() . '?' . http_build_query($params);
+
+                return request()->url()
+                    . '?'
+                    . http_build_query($params);
+
             };
 
-            $sortIcon = function (string $column) use ($sort, $direction) {
-                if ($sort !== $column) return 'fa-sort';
-                return $direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+
+            $sortIcon = function (
+                string $column
+            ) use (
+                $sort,
+                $direction
+            ) {
+
+                if($sort !== $column) {
+                    return 'fa-sort';
+                }
+
+                return $direction === 'asc'
+                    ? 'fa-sort-up'
+                    : 'fa-sort-down';
+
             };
+
         @endphp
+
 
         <!-- ===================================================== -->
         <!-- Payments Table -->
@@ -273,59 +645,134 @@
 
                 <tr>
 
-                    <th class="sortable" width="5%">
-                        <a href="{{ $buildSortUrl('id') }}" class="sort-link {{ $sort === 'id' ? 'active' : '' }}">
-                            ID <i class="fas sort-icon {{ $sortIcon('id') }}"></i>
+                    <th class="sortable"
+                        width="5%">
+
+                        <a href="{{ $buildSortUrl('id') }}"
+                           class="sort-link {{ $sort === 'id' ? 'active' : '' }}">
+
+                            ID
+
+                            <i class="fas sort-icon {{ $sortIcon('id') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th class="sortable" width="10%">
-                        <a href="{{ $buildSortUrl('receipt_no') }}" class="sort-link {{ $sort === 'receipt_no' ? 'active' : '' }}">
-                            Receipt No <i class="fas sort-icon {{ $sortIcon('receipt_no') }}"></i>
+
+                    <th class="sortable"
+                        width="10%">
+
+                        <a href="{{ $buildSortUrl('receipt_no') }}"
+                           class="sort-link {{ $sort === 'receipt_no' ? 'active' : '' }}">
+
+                            Receipt No
+
+                            <i class="fas sort-icon {{ $sortIcon('receipt_no') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th class="sortable" width="16%">
-                        <a href="{{ $buildSortUrl('student') }}" class="sort-link {{ $sort === 'student' ? 'active' : '' }}">
-                            Student <i class="fas sort-icon {{ $sortIcon('student') }}"></i>
+
+                    <th class="sortable"
+                        width="16%">
+
+                        <a href="{{ $buildSortUrl('student') }}"
+                           class="sort-link {{ $sort === 'student' ? 'active' : '' }}">
+
+                            Student
+
+                            <i class="fas sort-icon {{ $sortIcon('student') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th class="sortable" width="10%">
-                        <a href="{{ $buildSortUrl('voucher') }}" class="sort-link {{ $sort === 'voucher' ? 'active' : '' }}">
-                            Voucher <i class="fas sort-icon {{ $sortIcon('voucher') }}"></i>
+
+                    <th class="sortable"
+                        width="10%">
+
+                        <a href="{{ $buildSortUrl('voucher') }}"
+                           class="sort-link {{ $sort === 'voucher' ? 'active' : '' }}">
+
+                            Voucher
+
+                            <i class="fas sort-icon {{ $sortIcon('voucher') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th class="sortable" width="10%">
-                        <a href="{{ $buildSortUrl('amount_paid') }}" class="sort-link {{ $sort === 'amount_paid' ? 'active' : '' }}">
-                            Amount Paid <i class="fas sort-icon {{ $sortIcon('amount_paid') }}"></i>
+
+                    <th class="sortable"
+                        width="10%">
+
+                        <a href="{{ $buildSortUrl('amount_paid') }}"
+                           class="sort-link {{ $sort === 'amount_paid' ? 'active' : '' }}">
+
+                            Amount Paid
+
+                            <i class="fas sort-icon {{ $sortIcon('amount_paid') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th class="sortable" width="10%">
-                        <a href="{{ $buildSortUrl('payment_date') }}" class="sort-link {{ $sort === 'payment_date' ? 'active' : '' }}">
-                            Date <i class="fas sort-icon {{ $sortIcon('payment_date') }}"></i>
+
+                    <th class="sortable"
+                        width="10%">
+
+                        <a href="{{ $buildSortUrl('payment_date') }}"
+                           class="sort-link {{ $sort === 'payment_date' ? 'active' : '' }}">
+
+                            Date
+
+                            <i class="fas sort-icon {{ $sortIcon('payment_date') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th class="sortable" width="9%">
-                        <a href="{{ $buildSortUrl('payment_method') }}" class="sort-link {{ $sort === 'payment_method' ? 'active' : '' }}">
-                            Method <i class="fas sort-icon {{ $sortIcon('payment_method') }}"></i>
+
+                    <th class="sortable"
+                        width="9%">
+
+                        <a href="{{ $buildSortUrl('payment_method') }}"
+                           class="sort-link {{ $sort === 'payment_method' ? 'active' : '' }}">
+
+                            Method
+
+                            <i class="fas sort-icon {{ $sortIcon('payment_method') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th class="sortable" width="10%">
-                        <a href="{{ $buildSortUrl('received_by') }}" class="sort-link {{ $sort === 'received_by' ? 'active' : '' }}">
-                            Received By <i class="fas sort-icon {{ $sortIcon('received_by') }}"></i>
+
+                    <th class="sortable"
+                        width="10%">
+
+                        <a href="{{ $buildSortUrl('received_by') }}"
+                           class="sort-link {{ $sort === 'received_by' ? 'active' : '' }}">
+
+                            Received By
+
+                            <i class="fas sort-icon {{ $sortIcon('received_by') }}"></i>
+
                         </a>
+
                     </th>
 
-                    <th width="20%">Actions</th>
+
+                    <th width="20%">
+                        Actions
+                    </th>
 
                 </tr>
 
             </thead>
+
 
             <tbody>
 
@@ -333,67 +780,155 @@
 
                     <tr>
 
-                        <td>{{ $payment->id }}</td>
+                        <td>
+                            {{ $payment->id }}
+                        </td>
+
 
                         <td>
+
                             <a href="{{ route('fee-payments.receipt', $payment->id) }}"
                                target="_blank"
                                class="rcpt-link"
                                title="View receipt">
+
                                 {{ $payment->receipt_no }}
+
                             </a>
+
                         </td>
 
+
                         <td>
+
                             {{ strtoupper($payment->student->student_name ?? '') }}
+
+                            @if($payment->student && !$payment->student->is_active)
+
+                                <span class="inactive-student">
+                                    (Inactive)
+                                </span>
+
+                            @endif
+
+                            @if($payment->student && $payment->student->family_code)
+
+                                <br>
+
+                                <span class="family-badge">
+
+                                    {{ $payment->student->family_code }}
+
+                                </span>
+
+                            @endif
+
                         </td>
 
+
                         <td>
+
                             @if($payment->voucher)
+
                                 <a href="{{ route('fee-vouchers.print', $payment->voucher_id) }}"
                                    target="_blank"
                                    class="vno-link"
                                    title="View voucher">
+
                                     {{ $payment->voucher->voucher_no }}
+
                                 </a>
+
                             @else
+
                                 —
+
                             @endif
+
                         </td>
+
 
                         <td class="text-end text-green">
-                            <strong>{{ number_format($payment->amount_paid, 0) }}</strong>
+
+                            <strong>
+                                {{ number_format($payment->amount_paid, 0) }}
+                            </strong>
+
                         </td>
 
-                        <td>{{ date('d-M-Y', strtotime($payment->payment_date)) }}</td>
-
-                        <td>{{ $payment->payment_method }}</td>
-
-                        <td>{{ $payment->received_by }}</td>
 
                         <td>
 
-                            <a href="{{ route('fee-payments.receipt', ['id' => $payment->id, 'download' => 1]) }}"
+                            {{ date(
+                                'd-M-Y',
+                                strtotime($payment->payment_date)
+                            ) }}
+
+                        </td>
+
+
+                        <td>
+                            {{ $payment->payment_method }}
+                        </td>
+
+
+                        <td>
+                            {{ $payment->received_by }}
+                        </td>
+
+
+                        <td>
+
+                            <a href="{{ route(
+                                'fee-payments.receipt',
+                                [
+                                    'id' =>
+                                        $payment->id,
+
+                                    'download' =>
+                                        1
+                                ]
+                            ) }}"
                                target="_blank"
                                class="btn btn-dark"
-                               title="Save receipt as PDF (will later send via WhatsApp)">
-                                <i class="fas fa-paper-plane"></i> Send
+                               title="Save receipt as PDF">
+
+                                <i class="fas fa-paper-plane"></i>
+                                Send
+
                             </a>
 
-                            <a href="{{ route('fee-payments.edit', $payment->id) }}"
+
+                            <a href="{{ route(
+                                'fee-payments.edit',
+                                $payment->id
+                            ) }}"
                                class="btn btn-primary">
+
                                 Edit
+
                             </a>
+
 
                             <form method="POST"
-                                  action="{{ route('fee-payments.destroy', $payment->id) }}"
+                                  action="{{ route(
+                                      'fee-payments.destroy',
+                                      $payment->id
+                                  ) }}"
                                   style="display:inline;"
                                   onsubmit="return confirm('Are you sure you want to reverse this payment?')">
+
                                 @csrf
+
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-danger">
+
+                                <button type="submit"
+                                        class="btn btn-danger">
+
                                     Reverse
+
                                 </button>
+
                             </form>
 
                         </td>
@@ -404,8 +939,11 @@
 
                     <tr>
 
-                        <td colspan="9" style="text-align:center;">
-                            No payments found for this period.
+                        <td colspan="9"
+                            style="text-align:center;">
+
+                            No payments found for this period/filter.
+
                         </td>
 
                     </tr>
@@ -415,6 +953,7 @@
             </tbody>
 
         </table>
+
 
         <br>
 
