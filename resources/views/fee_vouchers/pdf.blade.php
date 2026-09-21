@@ -1,50 +1,55 @@
+```php
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
 
     <title>
-        Fee Voucher - {{ $voucher->voucher_no }}
+        {{ strtoupper($voucher->student->student_name ?? '') }} — {{ $voucher->voucher_no ?? $voucher->id }}
     </title>
 
     <style>
+
+        /* =========================================================
+           PAGE & BASE
+        ========================================================= */
 
         @page {
             size: A4;
             margin: 10mm;
         }
 
-        * {
+        *,
+        *::before,
+        *::after {
             box-sizing: border-box;
         }
 
         body {
             margin: 0;
             padding: 0;
-            font-family: DejaVu Sans, Arial, sans-serif;
+            font-family: "DejaVu Sans", Arial, sans-serif;
             font-size: 11px;
-            color: #222;
-            background: #fff;
+            background: #ffffff;
+            color: #000000;
         }
 
         .voucher {
             width: 100%;
             margin: 0 auto;
-            padding: 18px;
-            border: 1px solid #333;
+            background: #ffffff;
+            border: 1.5px solid #000000;
         }
 
-        /* ---------------------------------------------------------
+        /* =========================================================
            HEADER
-        --------------------------------------------------------- */
+        ========================================================= */
 
         .header {
             width: 100%;
-            border-bottom: 2px solid #222;
-            padding-bottom: 12px;
-            margin-bottom: 12px;
+            border-bottom: 2px solid #000000;
+            padding: 12px 16px;
         }
 
         .header-table {
@@ -53,117 +58,126 @@
         }
 
         .logo-cell {
-            width: 18%;
+            width: 12%;
             vertical-align: middle;
         }
 
         .logo {
-            max-width: 85px;
-            max-height: 85px;
+            width: 56px;
+            height: auto;
         }
 
         .school-cell {
-            width: 62%;
-            text-align: center;
+            width: 88%;
             vertical-align: middle;
         }
 
         .school-name {
-            font-size: 21px;
-            font-weight: bold;
-            margin-bottom: 4px;
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
 
-        .school-subtitle {
+        .school-sub {
+            font-size: 10px;
+            margin-top: 2px;
+        }
+
+        /* =========================================================
+           STATUS
+        ========================================================= */
+
+        .status-line {
+            text-align: center;
+            padding: 6px;
             font-size: 11px;
-            color: #555;
+            font-weight: 700;
+            border-bottom: 1px solid #000000;
+            letter-spacing: 1px;
         }
 
-        .voucher-cell {
-            width: 20%;
-            text-align: right;
+        /* =========================================================
+           BODY
+        ========================================================= */
+
+        .v-body {
+            padding: 16px;
+        }
+
+        /* =========================================================
+           TABLE BASE
+        ========================================================= */
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        /* =========================================================
+           INFORMATION GRID
+        ========================================================= */
+
+        .info-grid {
+            font-size: 11px;
+        }
+
+        .info-grid td {
+            border: 1px solid #000000;
+            padding: 5px 8px;
             vertical-align: middle;
         }
 
-        .voucher-title {
-            font-size: 15px;
-            font-weight: bold;
-            margin-bottom: 6px;
-        }
-
-        .voucher-number {
-            font-size: 11px;
-            font-weight: bold;
-        }
-
-        /* ---------------------------------------------------------
-           STATUS
-        --------------------------------------------------------- */
-
-        .status-wrapper {
-            text-align: center;
-            margin-bottom: 12px;
-        }
-
-        .status {
-            display: inline-block;
-            padding: 5px 14px;
-            border: 1px solid #333;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 10px;
-        }
-
-        /* ---------------------------------------------------------
-           INFORMATION
-        --------------------------------------------------------- */
-
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 14px;
-        }
-
-        .info-table td {
-            border: 1px solid #ccc;
-            padding: 7px;
-            vertical-align: top;
-        }
-
-        .label {
-            font-weight: bold;
-            color: #555;
+        .info-grid td.lbl {
+            font-weight: 700;
+            background: #eeeeee;
             width: 18%;
+            white-space: nowrap;
         }
 
-        .value {
+        .info-grid td.val {
             width: 32%;
         }
 
-        /* ---------------------------------------------------------
-           FEE ITEMS
-        --------------------------------------------------------- */
+        /* =========================================================
+           SECTION TITLES
+        ========================================================= */
 
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-            margin-bottom: 14px;
+        .section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: #000000;
+            color: #ffffff;
+            padding: 5px 8px;
+            margin-top: 14px;
         }
 
-        .items-table th {
-            background: #eeeeee;
-            border: 1px solid #999;
-            padding: 7px;
-            text-align: left;
+        /* =========================================================
+           FEE ITEMS
+        ========================================================= */
+
+        .items-table {
             font-size: 10px;
         }
 
+        .items-table th {
+            border: 1px solid #000000;
+            background: #eeeeee;
+            padding: 6px 8px;
+            font-size: 10px;
+            text-align: left;
+        }
+
         .items-table td {
-            border: 1px solid #ccc;
-            padding: 7px;
+            border: 1px solid #000000;
+            padding: 6px 8px;
             vertical-align: top;
         }
+
+        /* =========================================================
+           ALIGNMENT
+        ========================================================= */
 
         .text-right {
             text-align: right;
@@ -173,155 +187,204 @@
             text-align: center;
         }
 
-        /* ---------------------------------------------------------
-           TOTALS
-        --------------------------------------------------------- */
+        .mono {
+            font-family: "DejaVu Sans Mono", "Courier New", monospace;
+        }
 
-        .totals-wrapper {
+        /* =========================================================
+           TOTALS
+        ========================================================= */
+
+        .totals-wrap {
             width: 100%;
-            margin-top: 8px;
+            margin-top: 12px;
         }
 
         .totals-table {
-            width: 55%;
+            width: 300px;
             margin-left: auto;
-            border-collapse: collapse;
+            font-size: 11px;
         }
 
         .totals-table td {
-            border: 1px solid #ccc;
-            padding: 7px;
+            border: 1px solid #000000;
+            padding: 5px 8px;
         }
 
-        .total-label {
-            font-weight: bold;
+        .totals-table td.lbl {
+            font-weight: 700;
+            background: #eeeeee;
+        }
+
+        .totals-table td.val {
             text-align: right;
         }
 
-        .grand-total td {
-            font-weight: bold;
-            font-size: 13px;
-            background: #eeeeee;
-            border-top: 2px solid #333;
+        .row-payable td {
+            background: #000000;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 12px;
         }
 
-        /* ---------------------------------------------------------
+        .row-paid td {
+            font-weight: 700;
+        }
+
+        .row-balance td,
+        .row-balance-zero td {
+            font-weight: 700;
+            border-top: 2px solid #000000;
+        }
+
+        /* =========================================================
            AMOUNT IN WORDS
-        --------------------------------------------------------- */
+        ========================================================= */
 
         .amount-words {
-            margin-top: 12px;
-            padding: 8px;
-            border: 1px solid #ccc;
-        }
-
-        .amount-words-label {
-            font-weight: bold;
-        }
-
-        /* ---------------------------------------------------------
-           PREVIOUS BALANCE
-        --------------------------------------------------------- */
-
-        .previous-balance {
-            margin-top: 12px;
-            padding: 9px;
-            border: 1px solid #999;
-            background: #f5f5f5;
-        }
-
-        .previous-balance-title {
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        /* ---------------------------------------------------------
-           PAYMENT HISTORY
-        --------------------------------------------------------- */
-
-        .section-title {
-            margin-top: 15px;
-            margin-bottom: 7px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid #333;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .payment-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-        }
-
-        .payment-table th {
-            background: #eeeeee;
-            border: 1px solid #999;
-            padding: 6px;
-            text-align: left;
+            margin-top: 14px;
+            border: 1px solid #000000;
+            padding: 8px 10px;
             font-size: 10px;
         }
 
+        /* =========================================================
+           PAYMENT HISTORY
+        ========================================================= */
+
+        .payment-table {
+            margin-top: 0;
+            font-size: 10px;
+        }
+
+        .payment-table th {
+            border: 1px solid #000000;
+            background: #eeeeee;
+            padding: 5px 7px;
+            font-size: 9.5px;
+            text-align: left;
+        }
+
         .payment-table td {
-            border: 1px solid #ccc;
-            padding: 6px;
+            border: 1px solid #000000;
+            padding: 5px 7px;
+            font-size: 10px;
+            vertical-align: middle;
         }
 
-        /* ---------------------------------------------------------
+        .payment-table tfoot td {
+            font-weight: 700;
+            background: #eeeeee;
+        }
+
+        /* =========================================================
+           STATUS PILL
+        ========================================================= */
+
+        .pill {
+            border: 1px solid #000000;
+            padding: 2px 7px;
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        /* =========================================================
            NOTES
-        --------------------------------------------------------- */
+        ========================================================= */
 
-        .notes {
+        .notes-box {
             margin-top: 12px;
-            padding: 8px;
-            border: 1px solid #ccc;
+            border: 1px dashed #000000;
+            padding: 7px 10px;
+            font-size: 10px;
         }
 
-        .notes-title {
-            font-weight: bold;
-            margin-bottom: 4px;
-        }
-
-        /* ---------------------------------------------------------
+        /* =========================================================
            UNPAID NOTICE
-        --------------------------------------------------------- */
+        ========================================================= */
 
-        .unpaid-notice {
-            margin-top: 12px;
-            padding: 9px;
-            border: 1px solid #999;
+        .flag-box {
+            margin-top: 14px;
+            padding: 8px 12px;
+            border: 1px dashed #000000;
+            font-size: 11px;
+            font-weight: 700;
             text-align: center;
-            font-weight: bold;
         }
 
-        /* ---------------------------------------------------------
+        /* =========================================================
+           PREVIOUS BALANCE
+        ========================================================= */
+
+        .flag-box-left {
+            margin-top: 10px;
+            padding: 7px 10px;
+            border: 1px solid #000000;
+            font-size: 11px;
+        }
+
+        /* =========================================================
            FOOTER
-        --------------------------------------------------------- */
+        ========================================================= */
 
         .footer {
-            margin-top: 22px;
-            padding-top: 8px;
-            border-top: 1px solid #999;
-            text-align: center;
+            margin-top: 26px;
+            padding-top: 12px;
+            border-top: 1px dashed #000000;
             font-size: 9px;
-            color: #666;
-        }
-
-        .generated {
-            margin-top: 4px;
-            font-size: 8px;
-            color: #888;
         }
 
     </style>
-
 </head>
-
 
 <body>
 
-<div class="voucher">
+@php
 
+    /*
+    |--------------------------------------------------------------------------
+    | Voucher Calculations
+    |--------------------------------------------------------------------------
+    */
+
+    $status = strtolower($voucher->status ?? 'unpaid');
+
+    $paidAmount = (float) ($voucher->paid_amount ?? 0);
+
+    $balanceAmount = (float) (
+        $voucher->balance_amount
+        ?? $voucher->payable_amount
+        ?? 0
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment History
+    |--------------------------------------------------------------------------
+    */
+
+    $payments = $voucher->payments ?? collect();
+
+    $hasPayments = $payments->count() > 0;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Status Label
+    |--------------------------------------------------------------------------
+    */
+
+    $statusLabel = match ($status) {
+        'paid' => '*** FULLY PAID ***',
+
+        'partial' => '*** PARTIALLY PAID — BALANCE DUE ***',
+
+        default => '*** UNPAID — PAYMENT DUE ***',
+    };
+
+@endphp
+
+
+<div class="voucher">
 
     {{-- =========================================================
          HEADER
@@ -337,14 +400,15 @@
 
                     @if(!empty($logoData))
 
-                        <img src="{{ $logoData }}"
-                             class="logo"
-                             alt="School Logo">
+                        <img
+                            class="logo"
+                            src="{{ $logoData }}"
+                            alt="Peace Academy Logo"
+                        >
 
                     @endif
 
                 </td>
-
 
                 <td class="school-cell">
 
@@ -352,21 +416,8 @@
                         PEACE ACADEMY
                     </div>
 
-                    <div class="school-subtitle">
-                        Fee Voucher
-                    </div>
-
-                </td>
-
-
-                <td class="voucher-cell">
-
-                    <div class="voucher-title">
-                        FEE VOUCHER
-                    </div>
-
-                    <div class="voucher-number">
-                        {{ $voucher->voucher_no }}
+                    <div class="school-sub">
+                        Fee Management System
                     </div>
 
                 </td>
@@ -382,218 +433,48 @@
          STATUS
     ========================================================== --}}
 
-    <div class="status-wrapper">
-
-        <span class="status">
-            {{ strtoupper($voucher->status) }}
-        </span>
-
+    <div class="status-line">
+        {{ $statusLabel }}
     </div>
 
 
-    {{-- =========================================================
-         STUDENT / VOUCHER INFORMATION
-    ========================================================== --}}
-
-    <table class="info-table">
-
-        <tr>
-
-            <td class="label">
-                Student Name
-            </td>
-
-            <td class="value">
-                {{ strtoupper($voucher->student?->student_name ?? '—') }}
-            </td>
-
-            <td class="label">
-                Admission No.
-            </td>
-
-            <td class="value">
-                {{ $voucher->student?->admission_no ?? '—' }}
-            </td>
-
-        </tr>
+    <div class="v-body">
 
 
-        <tr>
+        {{-- =====================================================
+             STUDENT / VOUCHER INFORMATION
+        ====================================================== --}}
 
-            <td class="label">
-                Class
-            </td>
+        <table class="info-grid">
 
-            <td class="value">
-                {{ $voucher->student?->activeEnrollment?->class?->class_name ?? '—' }}
-            </td>
+            <tr>
 
-            <td class="label">
-                Family Code
-            </td>
+                <td class="lbl">
+                    Voucher No
+                </td>
 
-            <td class="value">
-                {{ $voucher->student?->family_code ?? '—' }}
-            </td>
+                <td class="val">
+                    {{ $voucher->voucher_no ?? ('#' . $voucher->id) }}
+                </td>
 
-        </tr>
+                <td class="lbl">
+                    Due Date
+                </td>
 
+                <td class="val" style="font-weight:700">
 
-        <tr>
+                    @if($voucher->due_date)
 
-            <td class="label">
-                Voucher Period
-            </td>
+                        {{ strtoupper(
+                            \Carbon\Carbon::parse($voucher->due_date)->format('d-M-Y')
+                        ) }}
 
-            <td class="value">
+                    @else
 
-                @if($voucher->period_from)
-
-                    {{ \Carbon\Carbon::parse($voucher->period_from)->format('d-M-Y') }}
-
-                    @if($voucher->period_to)
-
-                        -
-                        {{ \Carbon\Carbon::parse($voucher->period_to)->format('d-M-Y') }}
+                        —
 
                     @endif
 
-                @else
-
-                    —
-
-                @endif
-
-            </td>
-
-
-            <td class="label">
-                Due Date
-            </td>
-
-            <td class="value">
-
-                @if($voucher->due_date)
-
-                    {{ strtoupper(\Carbon\Carbon::parse($voucher->due_date)->format('d-M-Y')) }}
-
-                @else
-
-                    —
-
-                @endif
-
-            </td>
-
-        </tr>
-
-    </table>
-
-
-    {{-- =========================================================
-         FEE ITEMS
-    ========================================================== --}}
-
-    <div class="section-title">
-        Fee Details
-    </div>
-
-
-    <table class="items-table">
-
-        <thead>
-
-            <tr>
-
-                <th width="6%">
-                    #
-                </th>
-
-                <th width="28%">
-                    Fee Type
-                </th>
-
-                <th width="36%">
-                    Description
-                </th>
-
-                <th width="10%" class="text-center">
-                    Months
-                </th>
-
-                <th width="20%" class="text-right">
-                    Amount
-                </th>
-
-            </tr>
-
-        </thead>
-
-
-        <tbody>
-
-            @forelse($voucher->items as $index => $item)
-
-                <tr>
-
-                    <td class="text-center">
-                        {{ $index + 1 }}
-                    </td>
-
-                    <td>
-                        {{ $item->feeType?->name ?? '—' }}
-                    </td>
-
-                    <td>
-                        {{ $item->description ?? '—' }}
-                    </td>
-
-                    <td class="text-center">
-                        {{ $item->months_count ?? 1 }}
-                    </td>
-
-                    <td class="text-right">
-                        {{ number_format((float) $item->amount, 0) }}
-                    </td>
-
-                </tr>
-
-            @empty
-
-                <tr>
-
-                    <td colspan="5"
-                        class="text-center">
-
-                        No fee items found.
-
-                    </td>
-
-                </tr>
-
-            @endforelse
-
-        </tbody>
-
-    </table>
-
-
-    {{-- =========================================================
-         TOTALS
-    ========================================================== --}}
-
-    <div class="totals-wrapper">
-
-        <table class="totals-table">
-
-            <tr>
-
-                <td class="total-label">
-                    Total Amount
-                </td>
-
-                <td class="text-right">
-                    {{ number_format((float) $voucher->total_amount, 0) }}
                 </td>
 
             </tr>
@@ -601,12 +482,24 @@
 
             <tr>
 
-                <td class="total-label">
-                    Discount
+                <td class="lbl">
+                    Student Name
                 </td>
 
-                <td class="text-right">
-                    {{ number_format((float) $voucher->discount, 0) }}
+                <td class="val" style="font-weight:700">
+
+                    {{ strtoupper($voucher->student->student_name ?? '') }}
+
+                </td>
+
+                <td class="lbl">
+                    GR / Adm No
+                </td>
+
+                <td class="val">
+
+                    {{ strtoupper($voucher->student->admission_no ?? '—') }}
+
                 </td>
 
             </tr>
@@ -614,12 +507,24 @@
 
             <tr>
 
-                <td class="total-label">
-                    Payable Amount
+                <td class="lbl">
+                    Class
                 </td>
 
-                <td class="text-right">
-                    {{ number_format((float) $voucher->payable_amount, 0) }}
+                <td class="val">
+
+                    {{ $voucher->student?->activeEnrollment?->class?->class_name ?? '—' }}
+
+                </td>
+
+                <td class="lbl">
+                    Family Code
+                </td>
+
+                <td class="val">
+
+                    {{ $voucher->student->family_code ?? '—' }}
+
                 </td>
 
             </tr>
@@ -627,26 +532,56 @@
 
             <tr>
 
-                <td class="total-label">
-                    Paid Amount
+                <td class="lbl">
+                    Period
                 </td>
 
-                <td class="text-right">
-                    {{ number_format((float) $voucher->paid_amount, 0) }}
+                <td class="val" colspan="3">
+
+                    @if($voucher->period_from)
+
+                        {{ strtoupper(
+                            \Carbon\Carbon::parse($voucher->period_from)->format('d-M-Y')
+                        ) }}
+
+                    @endif
+
+                    @if($voucher->period_to)
+
+                        &nbsp;TO&nbsp;
+
+                        {{ strtoupper(
+                            \Carbon\Carbon::parse($voucher->period_to)->format('d-M-Y')
+                        ) }}
+
+                    @endif
+
                 </td>
 
             </tr>
 
 
-            <tr class="grand-total">
+            <tr>
 
-                <td class="total-label">
-                    Balance
+                <td class="lbl">
+                    Voucher Type
                 </td>
 
-                <td class="text-right">
+                <td class="val">
 
-                    {{ number_format((float) $voucher->balance_amount, 0) }}
+                    {{ ucfirst($voucher->voucher_type ?? 'Monthly') }}
+
+                </td>
+
+                <td class="lbl">
+                    Status
+                </td>
+
+                <td class="val">
+
+                    <span class="pill">
+                        {{ ucfirst($status) }}
+                    </span>
 
                 </td>
 
@@ -654,81 +589,44 @@
 
         </table>
 
-    </div>
 
-
-    {{-- =========================================================
-         AMOUNT IN WORDS
-    ========================================================== --}}
-
-    @if(!empty($voucher->amount_in_words))
-
-        <div class="amount-words">
-
-            <span class="amount-words-label">
-                Amount in Words:
-            </span>
-
-            {{ $voucher->amount_in_words }}
-
-        </div>
-
-    @endif
-
-
-    {{-- =========================================================
-         PREVIOUS BALANCE
-    ========================================================== --}}
-
-    @if((float) $previousBalance > 0)
-
-        <div class="previous-balance">
-
-            <div class="previous-balance-title">
-                Previous Outstanding Balance
-            </div>
-
-            Previous outstanding balance:
-            <strong>
-                {{ number_format((float) $previousBalance, 0) }}
-            </strong>
-
-        </div>
-
-    @endif
-
-
-    {{-- =========================================================
-         PAYMENT HISTORY
-    ========================================================== --}}
-
-    @if($voucher->payments && $voucher->payments->count() > 0)
+        {{-- =====================================================
+             FEE ITEMS
+        ====================================================== --}}
 
         <div class="section-title">
-            Payment History
+            Fee Items
         </div>
 
 
-        <table class="payment-table">
+        <table class="items-table">
 
             <thead>
 
                 <tr>
 
-                    <th>
-                        Date
+                    <th width="4%">
+                        #
                     </th>
 
-                    <th>
-                        Amount
+                    <th width="22%">
+                        Fee Type
                     </th>
 
-                    <th>
-                        Method
+                    <th width="32%">
+                        Description
                     </th>
 
-                    <th>
-                        Reference
+                    <th width="14%">
+                        Month
+                    </th>
+
+                    <th width="8%" class="text-center">
+                        Qty
+                    </th>
+
+                    <th width="20%" class="text-right">
+                        Amount (Rs.)
                     </th>
 
                 </tr>
@@ -738,19 +636,29 @@
 
             <tbody>
 
-                @foreach($voucher->payments as $payment)
+                @forelse($voucher->items as $index => $item)
 
                     <tr>
 
+                        <td class="text-center">
+                            {{ $index + 1 }}
+                        </td>
+
+                        <td>
+                            {{ $item->feeType?->name ?? '—' }}
+                        </td>
+
+                        <td>
+                            {{ $item->description ?: '—' }}
+                        </td>
+
                         <td>
 
-                            @if($payment->payment_date)
+                            @if($item->month)
 
-                                {{ \Carbon\Carbon::parse($payment->payment_date)->format('d-M-Y') }}
-
-                            @elseif($payment->created_at)
-
-                                {{ \Carbon\Carbon::parse($payment->created_at)->format('d-M-Y') }}
+                                {{ strtoupper(
+                                    \Carbon\Carbon::parse($item->month)->format('M Y')
+                                ) }}
 
                             @else
 
@@ -760,99 +668,460 @@
 
                         </td>
 
-
-                        <td class="text-right">
-
-                            {{ number_format((float) ($payment->amount ?? 0), 0) }}
-
+                        <td class="text-center">
+                            {{ $item->months_count ?? 1 }}
                         </td>
 
+                        <td class="text-right mono">
 
-                        <td>
-
-                            {{ $payment->payment_method ?? '—' }}
-
-                        </td>
-
-
-                        <td>
-
-                            {{ $payment->reference_no
-                                ?? $payment->reference
-                                ?? '—' }}
+                            {{ number_format(
+                                (float) $item->amount,
+                                0
+                            ) }}
 
                         </td>
 
                     </tr>
 
-                @endforeach
+                @empty
+
+                    <tr>
+
+                        <td
+                            colspan="6"
+                            class="text-center"
+                            style="padding:16px"
+                        >
+                            No fee items found.
+                        </td>
+
+                    </tr>
+
+                @endforelse
 
             </tbody>
 
         </table>
 
-    @endif
+
+        {{-- =====================================================
+             TOTALS
+        ====================================================== --}}
+
+        <div class="totals-wrap">
+
+            <table class="totals-table">
+
+                <tr>
+
+                    <td class="lbl">
+                        Sub-Total
+                    </td>
+
+                    <td class="val">
+
+                        {{ number_format(
+                            (float) ($voucher->total_amount ?? 0),
+                            0
+                        ) }}
+
+                    </td>
+
+                </tr>
 
 
-    {{-- =========================================================
-         NOTES
-    ========================================================== --}}
+                @if(($voucher->discount ?? 0) > 0)
 
-    @if(!empty($voucher->notes))
+                    <tr>
 
-        <div class="notes">
+                        <td class="lbl">
+                            Discount
+                        </td>
 
-            <div class="notes-title">
-                Notes
+                        <td class="val">
+
+                            ( {{ number_format(
+                                (float) $voucher->discount,
+                                0
+                            ) }} )
+
+                        </td>
+
+                    </tr>
+
+                @endif
+
+
+                <tr class="row-payable">
+
+                    <td class="lbl">
+                        Payable Amount
+                    </td>
+
+                    <td class="val">
+
+                        Rs.
+                        {{ number_format(
+                            (float) ($voucher->payable_amount ?? 0),
+                            0
+                        ) }}
+
+                    </td>
+
+                </tr>
+
+
+                @if($paidAmount > 0)
+
+                    <tr class="row-paid">
+
+                        <td class="lbl">
+
+                            Amount Received
+
+                            @if($hasPayments)
+
+                                <span style="font-weight:400;font-size:9px">
+
+                                    ({{ $payments->count() }}
+                                    payment{{ $payments->count() > 1 ? 's' : '' }})
+
+                                </span>
+
+                            @endif
+
+                        </td>
+
+                        <td class="val">
+
+                            Rs.
+                            {{ number_format(
+                                $paidAmount,
+                                0
+                            ) }}
+
+                        </td>
+
+                    </tr>
+
+
+                    <tr class="{{ $status === 'paid'
+                        ? 'row-balance-zero'
+                        : 'row-balance' }}">
+
+                        <td class="lbl">
+                            Balance Due
+                        </td>
+
+                        <td class="val">
+
+                            Rs.
+                            {{ number_format(
+                                $status === 'paid'
+                                    ? 0
+                                    : $balanceAmount,
+                                0
+                            ) }}
+
+                        </td>
+
+                    </tr>
+
+                @endif
+
+            </table>
+
+        </div>
+
+
+        {{-- =====================================================
+             AMOUNT IN WORDS
+        ====================================================== --}}
+
+        @if($voucher->amount_in_words)
+
+            <div class="amount-words">
+
+                <strong>
+                    Amount in Words:
+                </strong>
+
+                {{ strtoupper($voucher->amount_in_words) }}
+
             </div>
 
-            {{ $voucher->notes }}
+        @endif
+
+
+        {{-- =====================================================
+             PAYMENT HISTORY
+        ====================================================== --}}
+
+        @if($hasPayments)
+
+            <div
+                class="section-title"
+                style="margin-top:16px"
+            >
+
+                Payment History
+
+                <span
+                    style="
+                        font-weight:400;
+                        font-size:9px;
+                        margin-left:8px;
+                    "
+                >
+
+                    {{ $payments->count() }}
+                    payment{{ $payments->count() > 1 ? 's' : '' }}
+                    recorded
+
+                </span>
+
+            </div>
+
+
+            <table class="payment-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th width="20%">
+                            Payment Date
+                        </th>
+
+                        <th width="22%">
+                            Receipt No
+                        </th>
+
+                        <th width="18%">
+                            Method
+                        </th>
+
+                        <th width="22%">
+                            Notes
+                        </th>
+
+                        <th
+                            width="18%"
+                            class="text-right"
+                        >
+                            Amount (Rs.)
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    @foreach($payments as $pay)
+
+                        <tr>
+
+                            {{-- Payment Date --}}
+
+                            <td>
+
+                                @if($pay->payment_date)
+
+                                    {{ strtoupper(
+                                        \Carbon\Carbon::parse(
+                                            $pay->payment_date
+                                        )->format('d-M-Y')
+                                    ) }}
+
+                                @else
+
+                                    —
+
+                                @endif
+
+                            </td>
+
+
+                            {{-- Receipt Number --}}
+
+                            <td class="mono">
+
+                                {{ $pay->receipt_no ?? '—' }}
+
+                            </td>
+
+
+                            {{-- Payment Method --}}
+
+                            <td>
+
+                                {{ ucfirst(
+                                    $pay->payment_method ?? 'Cash'
+                                ) }}
+
+                            </td>
+
+
+                            {{-- Payment Notes --}}
+
+                            <td style="font-size:10px">
+
+                                {{ $pay->notes ?? '—' }}
+
+                            </td>
+
+
+                            {{-- ACTUAL PAYMENT AMOUNT FIELD --}}
+
+                            <td
+                                class="text-right mono"
+                                style="font-weight:700"
+                            >
+
+                                {{ number_format(
+                                    (float) ($pay->amount_paid ?? 0),
+                                    0
+                                ) }}
+
+                            </td>
+
+                        </tr>
+
+                    @endforeach
+
+                </tbody>
+
+
+                {{-- Payment total --}}
+
+                <tfoot>
+
+                    <tr>
+
+                        <td
+                            colspan="4"
+                            style="text-align:right;font-weight:700"
+                        >
+
+                            Total Received:
+
+                        </td>
+
+                        <td class="text-right mono">
+
+                            Rs.
+                            {{ number_format(
+                                (float) $payments->sum('amount_paid'),
+                                0
+                            ) }}
+
+                        </td>
+
+                    </tr>
+
+                </tfoot>
+
+            </table>
+
+        @elseif($status === 'unpaid')
+
+            {{-- No payments yet --}}
+
+            <div class="flag-box">
+
+                No payment received against this voucher.
+
+                &nbsp;|&nbsp;
+
+                Amount Due:
+
+                <span class="mono">
+
+                    Rs.
+                    {{ number_format(
+                        (float) ($voucher->payable_amount ?? 0),
+                        0
+                    ) }}
+
+                </span>
+
+            </div>
+
+        @endif
+
+
+        {{-- =====================================================
+             NOTES
+        ====================================================== --}}
+
+        @if($voucher->notes)
+
+            <div class="notes-box">
+
+                <strong>
+                    Notes:
+                </strong>
+
+                {{ $voucher->notes }}
+
+            </div>
+
+        @endif
+
+
+        {{-- =====================================================
+             PREVIOUS BALANCE
+        ====================================================== --}}
+
+        @if(isset($previousBalance) && (float) $previousBalance > 0)
+
+            <div class="flag-box-left">
+
+                <strong>
+                    Other Outstanding Balance:
+                </strong>
+
+                Rs.
+                {{ number_format(
+                    (float) $previousBalance,
+                    0
+                ) }}
+
+                due on previous vouchers.
+
+            </div>
+
+        @endif
+
+
+        {{-- =====================================================
+             FOOTER
+        ====================================================== --}}
+
+        <div class="footer">
+
+            <div>
+                Voucher ID: #{{ $voucher->id }}
+                |
+                Payment Method: Cash, Jazz Cash, EasyPaisa, Bank Transfer
+            </div>
+
+            <div>
+                Generated:
+                {{ now()
+                    ->setTimezone('Asia/Karachi')
+                    ->format('d-M-Y h:i A') }}
+            </div>
 
         </div>
 
-    @endif
-
-
-    {{-- =========================================================
-         UNPAID NOTICE
-    ========================================================== --}}
-
-    @if(
-        strtolower($voucher->status) !== 'paid'
-        && (float) $voucher->balance_amount > 0
-    )
-
-        <div class="unpaid-notice">
-
-            Please clear the outstanding balance by the due date.
-
-        </div>
-
-    @endif
-
-
-    {{-- =========================================================
-         FOOTER
-    ========================================================== --}}
-
-    <div class="footer">
-
-        <div>
-            Peace Academy
-        </div>
-
-        <div class="generated">
-
-            Generated on
-            {{ now()->setTimezone('Asia/Karachi')->format('d-M-Y h:i A') }}
-
-        </div>
 
     </div>
-
 
 </div>
 
 </body>
-
 </html>
+```

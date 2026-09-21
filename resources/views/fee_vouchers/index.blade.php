@@ -275,11 +275,6 @@
     </div>
 
 </form>
-
-
-
-
-
         <table>
 
             <thead>
@@ -400,51 +395,7 @@
 
                         </td>
 
-                        <!-- Student -->
-
-                        <td>
-
-                            @if($voucher->student)
-
-                                <a href="{{ route('students.show', $voucher->student->id) }}"
-                                   style="color:#0d6efd;text-decoration:none;font-weight:600;">
-
-                                    {{ strtoupper($voucher->student->student_name ?? '') }}
-
-                                </a>
-
-                                @if(!empty($voucher->student->family_code))
-
-                                    <br>
-
-                                    <a href="{{ route('students.index', ['family_code' => $voucher->student->family_code]) }}"
-                                       style="font-size:11px;color:#6c757d;text-decoration:none;"
-                                       title="View all students in this family">
-
-                                        <i class="fas fa-users"></i> {{ $voucher->student->family_code }}
-
-                                    </a>
-
-                                    @if(isset($familyOutstanding[$voucher->student->family_code]) && $familyOutstanding[$voucher->student->family_code] > 0)
-
-                                        <span style="font-size:11px;color:#dc3545;font-weight:bold;">
-
-                                            &middot; Due {{ number_format($familyOutstanding[$voucher->student->family_code],0) }}
-
-                                        </span>
-
-                                    @endif
-
-                                @endif
-
-                            @else
-
-                                {{-- No linked student --}}
-                                N/A
-
-                            @endif
-
-                        </td>
+                        <<!-- Student --> <td> @if($voucher->student) <a href="{{ route('students.show', $voucher->student->id) }}" style="color:#0d6efd;text-decoration:none;font-weight:600;"> {{ strtoupper($voucher->student->student_name ?? '') }} </a> @php $studentClass = $voucher->student->activeEnrollment?->class?->class_name; @endphp @if($studentClass) <br> <span style="font-size:11px;color:#495057;"> <i class="fas fa-school"></i> {{ $studentClass }} </span> @endif @if(!empty($voucher->student->family_code)) <br> <a href="{{ route('students.index', ['family_code' => $voucher->student->family_code]) }}" style="font-size:11px;color:#6c757d;text-decoration:none;" title="View all students in this family"> <i class="fas fa-users"></i> {{ $voucher->student->family_code }} </a> @if(isset($familyOutstanding[$voucher->student->family_code]) && $familyOutstanding[$voucher->student->family_code] > 0) <span style="font-size:11px;color:#dc3545;font-weight:bold;"> &middot; Due {{ number_format($familyOutstanding[$voucher->student->family_code],0) }} </span> @endif @endif @else {{-- No linked student --}} N/A @endif </td>
 
                         <!-- Payable Amount -->
 

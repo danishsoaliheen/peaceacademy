@@ -358,7 +358,7 @@ Route::put('/permissions', [PermissionController::class, 'update'])
         ->name('fee-payments.destroy');
 
 
-    /*
+/*
 |--------------------------------------------------------------------------
 | Fee Vouchers
 |--------------------------------------------------------------------------
@@ -391,6 +391,10 @@ Route::get('/fee-vouchers/{id}/print', [FeeVoucherController::class, 'print'])
 Route::post('/fee-vouchers/{id}/save-pdf', [FeeVoucherController::class, 'savePdf'])
     ->middleware('permission:fee-vouchers.print')
     ->name('fee-vouchers.save-pdf');
+
+Route::get('/fee-vouchers/{id}/pdf', [FeeVoucherController::class, 'viewPdf'])
+    ->middleware('signed')
+    ->name('fee-vouchers.pdf');
 
 Route::delete('/fee-vouchers/{id}', [FeeVoucherController::class, 'destroy'])
     ->middleware('permission:fee-vouchers.delete')
