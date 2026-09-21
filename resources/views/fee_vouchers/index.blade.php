@@ -180,9 +180,9 @@
     <!-- ===================================================== -->
 
     <div class="table-container">
-
 <form method="GET" class="row g-2 mb-3">
 
+    {{-- Search --}}
     <div class="col-md-3">
         <input type="text"
                name="search"
@@ -191,29 +191,75 @@
                placeholder="Voucher / Student">
     </div>
 
+    {{-- Student --}}
+    <div class="col-md-2">
+        <select name="student_id" class="form-select">
+
+            <option value="">All Students</option>
+
+            @foreach($students as $student)
+
+                <option value="{{ $student->id }}"
+                    {{ request('student_id') == $student->id ? 'selected' : '' }}>
+
+                    {{ $student->student_name }}
+
+                    @if(!$student->is_active)
+                        (Inactive)
+                    @endif
+
+                </option>
+
+            @endforeach
+
+        </select>
+    </div>
+
+    {{-- Family Code --}}
+    <div class="col-md-2">
+        <select name="family_code" class="form-select">
+
+            <option value="">All Families</option>
+
+            @foreach($familyCodes as $familyCode)
+
+                <option value="{{ $familyCode }}"
+                    {{ request('family_code') == $familyCode ? 'selected' : '' }}>
+
+                    {{ $familyCode }}
+
+                </option>
+
+            @endforeach
+
+        </select>
+    </div>
+
+    {{-- Status --}}
     <div class="col-md-2">
         <select name="status" class="form-select">
 
             <option value="">All Status</option>
 
             <option value="paid"
-                {{ request('status')=='paid' ? 'selected' : '' }}>
+                {{ request('status') == 'paid' ? 'selected' : '' }}>
                 Paid
             </option>
 
             <option value="partial"
-                {{ request('status')=='partial' ? 'selected' : '' }}>
+                {{ request('status') == 'partial' ? 'selected' : '' }}>
                 Partial
             </option>
 
             <option value="unpaid"
-                {{ request('status')=='unpaid' ? 'selected' : '' }}>
+                {{ request('status') == 'unpaid' ? 'selected' : '' }}>
                 Unpaid
             </option>
 
         </select>
     </div>
 
+    {{-- Class --}}
     <div class="col-md-2">
         <select name="class_id" class="form-select">
 
@@ -233,45 +279,63 @@
         </select>
     </div>
 
+    {{-- Go --}}
+    <div class="col-md-1">
+        <button type="submit"
+                class="btn btn-primary w-100">
+            Go
+        </button>
+    </div>
+
+    {{-- Month --}}
     <div class="col-md-2">
+
         <select name="month" class="form-select">
 
             <option value="">All Months</option>
 
-            @for($m=1;$m<=12;$m++)
+            @for($m = 1; $m <= 12; $m++)
 
                 <option value="{{ $m }}"
                     {{ request('month') == $m ? 'selected' : '' }}>
 
-                    {{ date('F', mktime(0,0,0,$m,1)) }}
+                    {{ date('F', mktime(0, 0, 0, $m, 1)) }}
 
                 </option>
 
             @endfor
 
         </select>
+
     </div>
 
+    {{-- Sort --}}
     <div class="col-md-2">
+
         <select name="sort" class="form-select">
 
             <option value="latest"
-                {{ request('sort')=='latest' ? 'selected' : '' }}>
+                {{ request('sort') == 'latest' ? 'selected' : '' }}>
                 Latest First
             </option>
 
             <option value="oldest"
-                {{ request('sort')=='oldest' ? 'selected' : '' }}>
+                {{ request('sort') == 'oldest' ? 'selected' : '' }}>
                 Oldest First
             </option>
 
         </select>
+
     </div>
 
+    {{-- Reset --}}
     <div class="col-md-1">
-        <button class="btn btn-primary w-100">
-            Go
-        </button>
+
+        <a href="{{ route('fee-vouchers.index') }}"
+           class="btn btn-secondary w-100">
+            Reset
+        </a>
+
     </div>
 
 </form>
@@ -395,7 +459,103 @@
 
                         </td>
 
-                        <<!-- Student --> <td> @if($voucher->student) <a href="{{ route('students.show', $voucher->student->id) }}" style="color:#0d6efd;text-decoration:none;font-weight:600;"> {{ strtoupper($voucher->student->student_name ?? '') }} </a> @php $studentClass = $voucher->student->activeEnrollment?->class?->class_name; @endphp @if($studentClass) <br> <span style="font-size:11px;color:#495057;"> <i class="fas fa-school"></i> {{ $studentClass }} </span> @endif @if(!empty($voucher->student->family_code)) <br> <a href="{{ route('students.index', ['family_code' => $voucher->student->family_code]) }}" style="font-size:11px;color:#6c757d;text-decoration:none;" title="View all students in this family"> <i class="fas fa-users"></i> {{ $voucher->student->family_code }} </a> @if(isset($familyOutstanding[$voucher->student->family_code]) && $familyOutstanding[$voucher->student->family_code] > 0) <span style="font-size:11px;color:#dc3545;font-weight:bold;"> &middot; Due {{ number_format($familyOutstanding[$voucher->student->family_code],0) }} </span> @endif @endif @else {{-- No linked student --}} N/A @endif </td>
+                        <td>
+
+    @if($voucher->student)
+
+        <a href="{{ route('students.show', $voucher->student->id) }}"
+           style="color:#0d6efd;text-decoration:none;font-weight:600;">
+
+            {{ strtoupper($voucher->student->student_name ?? '') }}
+
+        </a>
+
+        @if(!$voucher->student->is_active)
+
+            <span style="
+                font-size:10px;
+                color:#dc3545;
+                font-weight:bold;
+                margin-left:4px;
+            ">
+                (Inactive)
+            </span>
+
+        @endif
+
+        @php
+            $studentClass = $voucher->student
+                ->activeEnrollment
+                ?->class
+                ?->class_name;
+        @endphp
+
+        @if($studentClass)
+
+            <br>
+
+            <span style="font-size:11px;color:#495057;">
+
+                <i class="fas fa-school"></i>
+
+                {{ $studentClass }}
+
+            </span>
+
+        @endif
+
+        @if(!empty($voucher->student->family_code))
+
+            <br>
+
+            <a href="{{ route('students.index', [
+                'family_code' => $voucher->student->family_code
+            ]) }}"
+               style="
+                    font-size:11px;
+                    color:#6c757d;
+                    text-decoration:none;
+               "
+               title="View all students in this family">
+
+                <i class="fas fa-users"></i>
+
+                {{ $voucher->student->family_code }}
+
+            </a>
+
+            @if(
+                isset($familyOutstanding[$voucher->student->family_code])
+                && $familyOutstanding[$voucher->student->family_code] > 0
+            )
+
+                <span style="
+                    font-size:11px;
+                    color:#dc3545;
+                    font-weight:bold;
+                ">
+
+                    &middot;
+
+                    Due
+                    {{ number_format(
+                        $familyOutstanding[$voucher->student->family_code],
+                        0
+                    ) }}
+
+                </span>
+
+            @endif
+
+        @endif
+
+    @else
+
+        N/A
+
+    @endif
+
+</td>
 
                         <!-- Payable Amount -->
 
