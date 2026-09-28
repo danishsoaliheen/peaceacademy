@@ -23,6 +23,8 @@ class FeeVoucher extends Model
         'due_date',
         'status',
         'notes',
+        'pdf_path',
+
         // Carry-forward linking (added for previous-balance workflow)
         'carried_forward_to_voucher_id',
         'previous_balance_voucher_id',

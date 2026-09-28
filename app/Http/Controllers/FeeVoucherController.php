@@ -1413,6 +1413,18 @@ class FeeVoucherController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Store PDF Path In Voucher
+        |--------------------------------------------------------------------------
+        |
+        | This path is later used to create the secure PDF link for WhatsApp.
+        |
+        */
+
+        $voucher->pdf_path = $filePath;
+        $voucher->save();
+
+        /*
+        |--------------------------------------------------------------------------
         | Success Message
         |--------------------------------------------------------------------------
         */
@@ -1428,6 +1440,40 @@ class FeeVoucherController extends Controller
                 . ' / '
                 . $filename
             );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW SAVED PDF
+    |--------------------------------------------------------------------------
+    |
+    | Opens the already-generated voucher PDF from the secure signed route.
+    | The route itself is protected by Laravel's signed middleware.
+    |
+    */
+
+    public function viewPdf($id)
+    {
+        $voucher = FeeVoucher::findOrFail($id);
+
+        if (!$voucher->pdf_path) {
+            abort(404, 'Voucher PDF has not been generated yet.');
+        }
+
+        if (!Storage::disk('public')->exists($voucher->pdf_path)) {
+            abort(404, 'Voucher PDF file not found.');
+        }
+
+        return response()->file(
+            Storage::disk('public')->path($voucher->pdf_path),
+            [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'
+                    . basename($voucher->pdf_path)
+                    . '"',
+            ]
+        );
     }
 
 
