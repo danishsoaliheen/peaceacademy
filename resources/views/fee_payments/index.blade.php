@@ -116,6 +116,16 @@
         background:#dc3545;
     }
 
+    .btn-whatsapp{
+        background:#25D366;
+        color:#fff;
+    }
+
+    .btn-whatsapp:hover{
+        background:#1ebe5d;
+        color:#fff;
+    }
+
     .summary-box{
         display:flex;
         gap:15px;
@@ -780,10 +790,14 @@
 
                     <tr>
 
+                        <!-- ID -->
+
                         <td>
                             {{ $payment->id }}
                         </td>
 
+
+                        <!-- Receipt No -->
 
                         <td>
 
@@ -798,6 +812,8 @@
 
                         </td>
 
+
+                        <!-- Student -->
 
                         <td>
 
@@ -826,6 +842,8 @@
                         </td>
 
 
+                        <!-- Voucher -->
+
                         <td>
 
                             @if($payment->voucher)
@@ -848,6 +866,8 @@
                         </td>
 
 
+                        <!-- Amount -->
+
                         <td class="text-end text-green">
 
                             <strong>
@@ -856,6 +876,8 @@
 
                         </td>
 
+
+                        <!-- Date -->
 
                         <td>
 
@@ -867,17 +889,40 @@
                         </td>
 
 
+                        <!-- Payment Method -->
+
                         <td>
                             {{ $payment->payment_method }}
                         </td>
 
+
+                        <!-- Received By -->
 
                         <td>
                             {{ $payment->received_by }}
                         </td>
 
 
+                        <!-- Actions -->
+
                         <td>
+
+                            <!-- WhatsApp Payment Acknowledgement -->
+
+                            <a href="{{ route(
+                                'fee-payments.whatsapp',
+                                $payment->id
+                            ) }}"
+                               class="btn btn-whatsapp"
+                               title="Send payment acknowledgement through WhatsApp">
+
+                                <i class="fab fa-whatsapp"></i>
+                                WhatsApp
+
+                            </a>
+
+
+                            <!-- Receipt -->
 
                             <a href="{{ route(
                                 'fee-payments.receipt',
@@ -899,6 +944,8 @@
                             </a>
 
 
+                            <!-- Edit -->
+
                             <a href="{{ route(
                                 'fee-payments.edit',
                                 $payment->id
@@ -909,6 +956,8 @@
 
                             </a>
 
+
+                            <!-- Reverse -->
 
                             <form method="POST"
                                   action="{{ route(

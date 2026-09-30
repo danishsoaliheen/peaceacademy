@@ -356,6 +356,10 @@ Route::put('/permissions', [PermissionController::class, 'update'])
     Route::delete('/fee-payments/{id}', [FeePaymentController::class, 'destroy'])
         ->middleware('permission:fee-payments.delete')
         ->name('fee-payments.destroy');
+    
+    Route::get('/fee-payments/{id}/whatsapp',[FeePaymentController::class, 'whatsapp'])
+        ->middleware('permission:fee-payments.view')
+        ->name('fee-payments.whatsapp');
 
 
 /*
@@ -399,6 +403,10 @@ Route::get('/fee-vouchers/{id}/pdf', [FeeVoucherController::class, 'viewPdf'])
 Route::delete('/fee-vouchers/{id}', [FeeVoucherController::class, 'destroy'])
     ->middleware('permission:fee-vouchers.delete')
     ->name('fee-vouchers.destroy');
+
+Route::get('/fee-vouchers/{id}/whatsapp', [FeeVoucherController::class, 'whatsapp'])
+    ->middleware('permission:fee-vouchers.print')
+    ->name('fee-vouchers.whatsapp');
     /*
     |--------------------------------------------------------------------------
     | Student Ledger

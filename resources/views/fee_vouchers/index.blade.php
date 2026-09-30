@@ -696,6 +696,13 @@
 
 </form>
 
+<a href="{{ route('fee-vouchers.whatsapp', $voucher->id) }}"
+   class="btn"
+   style="background:#25D366;color:#fff;"
+   title="Send voucher through WhatsApp">
+    <i class="fab fa-whatsapp"></i> WhatsApp
+</a>
+
     <!-- Delete Button (only when no payment has ever been recorded) -->
 
     @if($voucher->payments->count() === 0)

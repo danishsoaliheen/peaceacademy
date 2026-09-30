@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+
 
 use App\Models\Student;
 use App\Models\PaClass;
@@ -1487,6 +1489,181 @@ class FeeVoucherController extends Controller
     | A voucher can only be deleted if NO payment has ever been recorded.
     |
     */
+
+public function whatsapp($id)
+{
+    $voucher = FeeVoucher::with([
+        'student',
+        'student.enrollments.class',
+    ])->findOrFail($id);
+
+    $student = $voucher->student;
+
+    if (!$student) {
+        return back()->with(
+            'error',
+            'Student record not found.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Number
+    |--------------------------------------------------------------------------
+    |
+    | Priority:
+    | 1. Student WhatsApp
+    | 2. Mother's WhatsApp
+    |
+    */
+
+    $whatsappNumber = $student->whatsapp_no
+        ?: $student->mother_whatsapp_no;
+
+    if (!$whatsappNumber) {
+        return back()->with(
+            'error',
+            'No WhatsApp number is available for this student.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PDF Check
+    |--------------------------------------------------------------------------
+    */
+
+    if (!$voucher->pdf_path) {
+        return back()->with(
+            'error',
+            'Please generate and save the PDF first.'
+        );
+    }
+
+    if (!Storage::disk('public')->exists($voucher->pdf_path)) {
+        return back()->with(
+            'error',
+            'The saved PDF file could not be found.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize WhatsApp Number
+    |--------------------------------------------------------------------------
+    |
+    | Example:
+    | 03001234567 -> 923001234567
+    |
+    | The number stored in the database is NOT changed.
+    |
+    */
+
+    $whatsappNumber = preg_replace(
+        '/[^0-9]/',
+        '',
+        $whatsappNumber
+    );
+
+    if (str_starts_with($whatsappNumber, '0')) {
+        $whatsappNumber =
+            '92' . substr($whatsappNumber, 1);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create Temporary Signed PDF URL
+    |--------------------------------------------------------------------------
+    |
+    | Valid for 30 days.
+    |
+    */
+
+    $pdfUrl = URL::temporarySignedRoute(
+        'fee-vouchers.pdf',
+        now()->addDays(30),
+        [
+            'id' => $voucher->id
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Student Name
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | The actual database column is student_name.
+    |
+    */
+
+    $studentName = trim((string) $student->student_name);
+
+    if ($studentName === '') {
+        $studentName = 'Student';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Class Name
+    |--------------------------------------------------------------------------
+    */
+
+    $className =
+        $student->activeEnrollment?->class?->class_name
+        ?? 'N/A';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Voucher Month
+    |--------------------------------------------------------------------------
+    |
+    | period_from may be returned as a normal string unless it is
+    | explicitly cast to Carbon in the FeeVoucher model. Therefore
+    | Carbon::parse() is used here instead of calling ->format()
+    | directly on period_from.
+    |
+    */
+
+    $voucherMonth = $voucher->period_from
+        ? Carbon::parse($voucher->period_from)->format('F Y')
+        : 'N/A';
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Message
+    |--------------------------------------------------------------------------
+    */
+
+    $message =
+        "Assalam-o-Alaikum,\n\n"
+        . "Fee Voucher ({$voucher->voucher_no}) "
+        . "for {$studentName} of {$className} "
+        . "generated for the month of {$voucherMonth}\n\n"
+        . "Please find the fee voucher here:\n"
+        . $pdfUrl
+        . "\n\n"
+        . "Regards,\n"
+        . "Peace Academy";
+
+    /*
+    |--------------------------------------------------------------------------
+    | Open WhatsApp With Pre-filled Message
+    |--------------------------------------------------------------------------
+    */
+
+    $whatsappUrl =
+        'https://wa.me/'
+        . $whatsappNumber
+        . '?text='
+        . urlencode($message);
+
+    return redirect()->away($whatsappUrl);
+}
+
+
+    
+
 
     public function destroy($id)
     {

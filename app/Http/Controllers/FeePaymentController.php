@@ -724,6 +724,200 @@ class FeePaymentController extends Controller
             );
     }
 
+/*
+|--------------------------------------------------------------------------
+| WhatsApp Payment Acknowledgement
+|--------------------------------------------------------------------------
+|
+| Opens WhatsApp with a pre-filled payment acknowledgement.
+| No payment receipt PDF is generated or attached.
+|
+*/
+
+public function whatsapp($id)
+{
+    $payment = FeePayment::with([
+        'student',
+        'voucher',
+    ])->findOrFail($id);
+
+    $student = $payment->student;
+    $voucher = $payment->voucher;
+
+    if (!$student) {
+        return back()->with(
+            'error',
+            'Student record not found.'
+        );
+    }
+
+    if (!$voucher) {
+        return back()->with(
+            'error',
+            'Fee voucher record not found.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Number
+    |--------------------------------------------------------------------------
+    |
+    | Priority:
+    | 1. Student WhatsApp
+    | 2. Mother's WhatsApp
+    |
+    */
+
+    $whatsappNumber =
+        $student->whatsapp_no
+        ?: $student->mother_whatsapp_no;
+
+    if (!$whatsappNumber) {
+        return back()->with(
+            'error',
+            'No WhatsApp number is available for this student.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Normalize Pakistan WhatsApp Number
+    |--------------------------------------------------------------------------
+    */
+
+    $whatsappNumber = preg_replace(
+        '/\D+/',
+        '',
+        $whatsappNumber
+    );
+
+    if (str_starts_with($whatsappNumber, '0')) {
+        $whatsappNumber =
+            '92' . substr($whatsappNumber, 1);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Class Name
+    |--------------------------------------------------------------------------
+    */
+
+    $student->loadMissing(
+        'enrollments.class'
+    );
+
+    $className =
+        $student->activeEnrollment?->class?->class_name
+        ?? 'N/A';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh Voucher Balance
+    |--------------------------------------------------------------------------
+    |
+    | Make sure we use the balance AFTER this payment.
+    |
+    */
+
+    $voucher->recalculateBalance();
+    $voucher->refresh();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Student Name
+    |--------------------------------------------------------------------------
+    */
+
+    $studentName =
+        $student->student_name
+        ?: 'Student';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment Date
+    |--------------------------------------------------------------------------
+    */
+
+    $paymentDate =
+        date(
+            'd F Y',
+            strtotime($payment->payment_date)
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Amount Received
+    |--------------------------------------------------------------------------
+    */
+
+    $amountReceived =
+        number_format(
+            (float) $payment->amount_paid,
+            0
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Remaining Balance
+    |--------------------------------------------------------------------------
+    */
+
+    $remainingBalance =
+        number_format(
+            max(
+                0,
+                (float) $voucher->balance_amount
+            ),
+            0
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment Status
+    |--------------------------------------------------------------------------
+    */
+
+    $status =
+        (float) $voucher->balance_amount <= 0
+            ? 'Paid in Full'
+            : 'Partially Paid';
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Message
+    |--------------------------------------------------------------------------
+    */
+
+    $message =
+        "Assalam-o-Alaikum,\n\n"
+        . "Payment received for {$studentName} of {$className}.\n"
+        . "Receipt No: {$payment->receipt_no}\n"
+        . "Mode of payment: {$payment->payment_method}\n"
+        . "Payment Date: {$paymentDate}\n"
+        . "Amount Received: Rs. {$amountReceived}\n"
+        . "Remaining Balance: Rs. {$remainingBalance}\n"
+        . "Status: {$status}\n\n"
+        . "Thank you.\n"
+        . "PEACE ACADEMY";
+
+    /*
+    |--------------------------------------------------------------------------
+    | Open WhatsApp With Pre-filled Message
+    |--------------------------------------------------------------------------
+    */
+
+    $whatsappUrl =
+        'https://wa.me/'
+        . $whatsappNumber
+        . '?text='
+        . urlencode($message);
+
+    return redirect()->away(
+        $whatsappUrl
+    );
+}
+
     /*
     |--------------------------------------------------------------------------
     | Print / Download Receipt
