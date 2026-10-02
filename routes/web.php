@@ -396,10 +396,6 @@ Route::post('/fee-vouchers/{id}/save-pdf', [FeeVoucherController::class, 'savePd
     ->middleware('permission:fee-vouchers.print')
     ->name('fee-vouchers.save-pdf');
 
-Route::get('/fee-vouchers/{id}/pdf', [FeeVoucherController::class, 'viewPdf'])
-    ->middleware('signed')
-    ->name('fee-vouchers.pdf');
-
 Route::delete('/fee-vouchers/{id}', [FeeVoucherController::class, 'destroy'])
     ->middleware('permission:fee-vouchers.delete')
     ->name('fee-vouchers.destroy');
@@ -636,3 +632,18 @@ Route::get('/fee-vouchers/{id}/whatsapp', [FeeVoucherController::class, 'whatsap
         ->middleware('permission:expenses.delete')
         ->name('expenses.destroy');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Public Signed Fee Voucher PDF
+|--------------------------------------------------------------------------
+|
+| This route intentionally sits OUTSIDE the auth.custom middleware group.
+| Parents can open the signed URL from WhatsApp without logging in.
+| Laravel's signed middleware still validates the URL signature/expiry.
+|
+*/
+
+Route::get('/fee-vouchers/{id}/pdf', [FeeVoucherController::class, 'viewPdf'])
+    ->middleware('signed')
+    ->name('fee-vouchers.pdf');
