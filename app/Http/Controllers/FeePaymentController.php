@@ -744,12 +744,24 @@ public function whatsapp($id)
     $student = $payment->student;
     $voucher = $payment->voucher;
 
+    /*
+    |--------------------------------------------------------------------------
+    | Student Check
+    |--------------------------------------------------------------------------
+    */
+
     if (!$student) {
         return back()->with(
             'error',
             'Student record not found.'
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Voucher Check
+    |--------------------------------------------------------------------------
+    */
 
     if (!$voucher) {
         return back()->with(
@@ -773,10 +785,16 @@ public function whatsapp($id)
         $student->whatsapp_no
         ?: $student->mother_whatsapp_no;
 
+    /*
+    |--------------------------------------------------------------------------
+    | No WhatsApp Number
+    |--------------------------------------------------------------------------
+    */
+
     if (!$whatsappNumber) {
         return back()->with(
             'error',
-            'No WhatsApp number is available for this student.'
+            'WhatsApp number not updated in Student Profile.'
         );
     }
 
@@ -821,6 +839,7 @@ public function whatsapp($id)
     */
 
     $voucher->recalculateBalance();
+
     $voucher->refresh();
 
     /*
@@ -891,12 +910,10 @@ public function whatsapp($id)
 
     $message =
         "Assalam-o-Alaikum,\n\n"
-        . "Payment received for {$studentName} of {$className}.\n"
+        . "Rs. {$amountReceived}/- {$payment->payment_method} received for {$studentName} of {$className} on {$paymentDate}.\n"
+        . "against Voucher No: {$voucher->voucher_no}\n"
         . "Receipt No: {$payment->receipt_no}\n"
-        . "Mode of payment: {$payment->payment_method}\n"
-        . "Payment Date: {$paymentDate}\n"
-        . "Amount Received: Rs. {$amountReceived}\n"
-        . "Remaining Balance: Rs. {$remainingBalance}\n"
+        . "Remaining Balance: Rs. {$remainingBalance}/-\n"
         . "Status: {$status}\n\n"
         . "Thank you.\n"
         . "PEACE ACADEMY";

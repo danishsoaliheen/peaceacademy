@@ -1481,16 +1481,14 @@ class FeeVoucherController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DESTROY
+    | WHATSAPP
     |--------------------------------------------------------------------------
     |
-    | Used to remove duplicate / mistakenly-created vouchers.
-    |
-    | A voucher can only be deleted if NO payment has ever been recorded.
+    | Open WhatsApp with a pre-filled message containing the secure PDF URL.
     |
     */
 
-public function whatsapp($id)
+    public function whatsapp($id)
 {
     $voucher = FeeVoucher::with([
         'student',
@@ -1667,29 +1665,24 @@ public function whatsapp($id)
 
     public function destroy($id)
     {
-        $voucher =
-            FeeVoucher::withCount(
-                'payments'
-            )->findOrFail($id);
+        $voucher = FeeVoucher::withCount('payments')->findOrFail($id);
 
         /*
         |--------------------------------------------------------------------------
         | Do Not Delete Voucher With Payments
         |--------------------------------------------------------------------------
+        |
+        | A voucher with payment history must first have its payment(s)
+        | reversed from Payment History.
+        |
         */
-
-        if (
-            $voucher->payments_count > 0
-        ) {
+        if ($voucher->payments_count > 0) {
 
             return redirect()
-                ->route(
-                    'fee-vouchers.index'
-                )
+                ->route('fee-vouchers.index')
                 ->with(
                     'error',
-                    'Voucher '
-                    . $voucher->voucher_no
+                    'Voucher ' . $voucher->voucher_no
                     . ' has payment(s) recorded against it and cannot be deleted. '
                     . 'Reverse the payment(s) from Payment History first, then delete the voucher.'
                 );
@@ -1697,58 +1690,136 @@ public function whatsapp($id)
 
         /*
         |--------------------------------------------------------------------------
-        | Do Not Delete Carried Forward Voucher
+        | Do Not Delete A Voucher That Was Itself Carried Forward
         |--------------------------------------------------------------------------
+        |
+        | This is an OLD voucher which has already been absorbed into another
+        | voucher. We keep it for financial/history purposes.
+        |
         */
-
-        if (
-            $voucher->status ===
-            'carried_forward'
-        ) {
+        if ($voucher->status === 'carried_forward') {
 
             return redirect()
-                ->route(
-                    'fee-vouchers.index'
-                )
+                ->route('fee-vouchers.index')
                 ->with(
                     'error',
-                    'Voucher '
-                    . $voucher->voucher_no
+                    'Voucher ' . $voucher->voucher_no
                     . ' has been carried forward into voucher '
-                    . optional(
-                        $voucher->carriedForwardTo
-                    )->voucher_no
+                    . optional($voucher->carriedForwardTo)->voucher_no
                     . ' and cannot be deleted, to preserve the balance history.'
                 );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Delete Voucher + Items
+        | Delete Voucher + Reverse Carry-Forward Sources
         |--------------------------------------------------------------------------
+        |
+        | If this voucher absorbed one or more previous outstanding vouchers,
+        | restore all of those source vouchers before deleting this voucher.
+        |
+        | We use carried_forward_to_voucher_id rather than only
+        | previous_balance_voucher_id because one new voucher can absorb
+        | multiple previous vouchers.
+        |
         */
+        DB::transaction(function () use ($voucher) {
 
-        DB::transaction(
-            function () use ($voucher) {
+            $sourceVouchers = FeeVoucher::where(
+                'carried_forward_to_voucher_id',
+                $voucher->id
+            )
+                ->lockForUpdate()
+                ->get();
 
-                FeeVoucherItem::where(
-                    'voucher_id',
-                    $voucher->id
-                )->delete();
+            /*
+            |--------------------------------------------------------------------------
+            | Restore Each Previous Voucher
+            |--------------------------------------------------------------------------
+            */
+            foreach ($sourceVouchers as $sourceVoucher) {
 
-                $voucher->delete();
+                /*
+                |------------------------------------------------------------------
+                | Remove Carry-Forward Relationship
+                |------------------------------------------------------------------
+                */
+                $sourceVoucher->carried_forward_to_voucher_id = null;
+
+                /*
+                |------------------------------------------------------------------
+                | Recalculate Original Balance / Status
+                |------------------------------------------------------------------
+                |
+                | FeeVoucher::recalculateBalance() uses the actual payment
+                | history, so we correctly restore:
+                |
+                | No payment      -> unpaid
+                | Partial payment -> partial
+                | Full payment    -> paid
+                |
+                */
+                $sourceVoucher->recalculateBalance();
+
+                /*
+                |------------------------------------------------------------------
+                | Keep Audit Trail
+                |------------------------------------------------------------------
+                */
+                $sourceVoucher->notes = trim(
+                    ($sourceVoucher->notes
+                        ? $sourceVoucher->notes . ' | '
+                        : '')
+                    . 'Carry-forward to voucher '
+                    . $voucher->voucher_no
+                    . ' was reversed because that voucher was deleted on '
+                    . now()->format('Y-m-d')
+                );
+
+                $sourceVoucher->save();
             }
-        );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Delete Generated PDF
+            |--------------------------------------------------------------------------
+            |
+            | Prevent an orphaned PDF from remaining in storage.
+            |
+            */
+            if ($voucher->pdf_path) {
+
+                Storage::disk('public')->delete(
+                    $voucher->pdf_path
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Delete Voucher Items
+            |--------------------------------------------------------------------------
+            */
+            FeeVoucherItem::where(
+                'voucher_id',
+                $voucher->id
+            )->delete();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Delete Voucher
+            |--------------------------------------------------------------------------
+            */
+            $voucher->delete();
+        });
 
         return redirect()
-            ->route(
-                'fee-vouchers.index'
-            )
+            ->route('fee-vouchers.index')
             ->with(
                 'success',
                 'Fee Voucher '
                 . $voucher->voucher_no
-                . ' deleted successfully.'
+                . ' deleted successfully. Any previous voucher(s) carried into it have been restored.'
             );
     }
+
 }
