@@ -798,71 +798,94 @@ class FeeVoucherController extends Controller
 
     public function edit($id)
     {
-        $voucher = FeeVoucher::with([
-
-            'items',
-            'student',
-            'payments'
-
-        ])->findOrFail($id);
+        /*
+        |--------------------------------------------------------------------------
+        | Authorization: Admin and Accountant Only
+        |--------------------------------------------------------------------------
+        */
 
         if (
-            in_array(
-                $voucher->status,
-                [
-                    'paid',
-                    'carried_forward'
-                ],
-                true
-            )
+            !auth()->check()
+            || !auth()->user()->hasRole(['admin', 'accountant'])
         ) {
+            abort(403, 'You are not authorized to edit fee vouchers.');
+        }
 
-            $reason =
-                $voucher->status === 'paid'
+        /*
+        |--------------------------------------------------------------------------
+        | Load Voucher
+        |--------------------------------------------------------------------------
+        */
 
-                ? 'This voucher is fully paid and can no longer be edited. Use "Fix Method" on that voucher to correct the payment method or reference number.'
+        $voucher = FeeVoucher::with([
+            'items',
+            'student',
+            'payments',
+        ])->findOrFail($id);
 
-                : 'This voucher has been carried forward into voucher '
-                    . optional(
-                        $voucher->carriedForwardTo
-                    )->voucher_no
-                    . ' and can no longer be edited.';
+        /*
+        |--------------------------------------------------------------------------
+        | Only Unpaid Vouchers Without Payments Can Be Edited
+        |--------------------------------------------------------------------------
+        */
 
+        $status = strtolower(
+            str_replace(
+                [' ', '-'],
+                '_',
+                (string) $voucher->status
+            )
+        );
+
+        if (
+            $status !== 'unpaid'
+            || (float) ($voucher->paid_amount ?? 0) > 0
+            || $voucher->payments->isNotEmpty()
+        ) {
             return redirect()
-                ->route(
-                    'fee-vouchers.index'
-                )
+                ->route('fee-vouchers.index')
                 ->with(
                     'error',
-                    $reason
+                    'Only unpaid vouchers with no recorded payments can be edited.'
                 );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Partial Payment Lock
+        | Payment Lock
+        |--------------------------------------------------------------------------
+        |
+        | The voucher has already passed the no-payment checks above.
+        |
+        */
+
+        $hasPayments = false;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Classes
         |--------------------------------------------------------------------------
         */
 
-        $hasPayments =
-            $voucher->payments->count() > 0;
+        $classes = PaClass::orderBy('class_order')->get();
 
-        $classes = PaClass::orderBy(
-            'class_order'
-        )->get();
+        /*
+        |--------------------------------------------------------------------------
+        | Students
+        |--------------------------------------------------------------------------
+        */
 
-        $students = Student::with(
-            'enrollments.class'
-        )
-        ->orderBy(
-            'student_name'
-        )
-        ->get();
+        $students = Student::with('enrollments.class')
+            ->orderBy('student_name')
+            ->get();
 
-        $feeTypes = FeeType::where(
-            'is_active',
-            1
-        )->get();
+        /*
+        |--------------------------------------------------------------------------
+        | Active Fee Types
+        |--------------------------------------------------------------------------
+        */
+
+        $feeTypes = FeeType::where('is_active', 1)->get();
 
         /*
         |--------------------------------------------------------------------------
@@ -870,23 +893,21 @@ class FeeVoucherController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $classFeeMap =
-            \App\Models\ClassFeeStructure::where(
-                'is_active',
-                1
-            )
+        $classFeeMap = \App\Models\ClassFeeStructure::where(
+            'is_active',
+            1
+        )
             ->get([
                 'class_id',
                 'fee_type_id',
-                'amount'
+                'amount',
             ])
             ->groupBy('class_id')
             ->map(
-                fn ($rows) =>
-                    $rows->pluck(
-                        'amount',
-                        'fee_type_id'
-                    )
+                fn ($rows) => $rows->pluck(
+                    'amount',
+                    'fee_type_id'
+                )
             )
             ->toArray();
 
@@ -910,207 +931,179 @@ class FeeVoucherController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function update(
-        Request $request,
-        $id
-    ) {
-
-        $voucher = FeeVoucher::with(
-            'payments'
-        )->findOrFail($id);
+    public function update(Request $request, $id)
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Authorization: Admin and Accountant Only
+        |--------------------------------------------------------------------------
+        */
 
         if (
-            in_array(
-                $voucher->status,
-                [
-                    'paid',
-                    'carried_forward'
-                ],
-                true
-            )
+            !auth()->check()
+            || !auth()->user()->hasRole(['admin', 'accountant'])
         ) {
-
-            $reason =
-                $voucher->status === 'paid'
-
-                ? 'This voucher is fully paid and can no longer be edited. Use "Fix Method" on that voucher to correct the payment method or reference number instead.'
-
-                : 'This voucher has been carried forward into voucher '
-                    . optional(
-                        $voucher->carriedForwardTo
-                    )->voucher_no
-                    . ' and can no longer be edited.';
-
-            return redirect()
-                ->route(
-                    'fee-vouchers.index'
-                )
-                ->with(
-                    'error',
-                    $reason
-                );
+            abort(403, 'You are not authorized to edit fee vouchers.');
         }
 
-        $hasPayments =
-            $voucher->payments->count() > 0;
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Voucher Eligibility
+        |--------------------------------------------------------------------------
+        */
 
-        if ($hasPayments) {
+        $voucher = FeeVoucher::with('payments')->findOrFail($id);
 
-            $request->validate([
-
-                'period_from' =>
-                    'required|date',
-
-                'period_to' =>
-                    'required|date|after_or_equal:period_from',
-
-                'due_date' =>
-                    'required|date',
-            ]);
-
-        } else {
-
-            $request->validate([
-
-                'student_id' =>
-                    'required|exists:students,id',
-
-                'period_from' =>
-                    'required|date',
-
-                'period_to' =>
-                    'required|date|after_or_equal:period_from',
-
-                'payable_amount' =>
-                    'required|numeric|min:0',
-
-                'due_date' =>
-                    'required|date',
-            ]);
-        }
-
-        DB::transaction(
-            function () use (
-                $request,
-                $voucher,
-                $hasPayments
-            ) {
-
-                $updateData = [
-
-                    'period_from' =>
-                        $request->period_from,
-
-                    'period_to' =>
-                        $request->period_to,
-
-                    'due_date' =>
-                        $request->due_date,
-
-                    'notes' =>
-                        $request->notes,
-                ];
-
-                if (!$hasPayments) {
-
-                    $updateData['student_id'] =
-                        $request->student_id;
-
-                    $updateData['total_amount'] =
-                        $request->total_amount;
-
-                    $updateData['discount'] =
-                        $request->discount ?? 0;
-
-                    $updateData['payable_amount'] =
-                        $request->payable_amount;
-
-                    $updateData['amount_in_words'] =
-                        $request->amount_in_words;
-                }
-
-                $voucher->update(
-                    $updateData
-                );
-
-                /*
-                |--------------------------------------------------------------------------
-                | Rebuild Items
-                |--------------------------------------------------------------------------
-                */
-
-                if (!$hasPayments) {
-
-                    FeeVoucherItem::where(
-                        'voucher_id',
-                        $voucher->id
-                    )->delete();
-
-                    if ($request->fee_type_id) {
-
-                        foreach (
-                            $request->fee_type_id
-                            as $key => $feeTypeId
-                        ) {
-
-                            $monthValue =
-                                $request->month[$key]
-                                ?? null;
-
-                            if (
-                                $monthValue
-                                && strlen($monthValue) === 7
-                            ) {
-
-                                $monthValue .= '-01';
-                            }
-
-                            FeeVoucherItem::create([
-
-                                'voucher_id' =>
-                                    $voucher->id,
-
-                                'fee_type_id' =>
-                                    $feeTypeId,
-
-                                'description' =>
-                                    $request->description[$key]
-                                    ?? null,
-
-                                'month' =>
-                                    $monthValue,
-
-                                'months_count' =>
-                                    $request->months_count[$key]
-                                    ?? 1,
-
-                                'amount' =>
-                                    $request->amount[$key],
-                            ]);
-                        }
-                    }
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | Recalculate Payment / Balance / Status
-                |--------------------------------------------------------------------------
-                */
-
-                $voucher->recalculateBalance();
-            }
+        $status = strtolower(
+            str_replace(
+                [' ', '-'],
+                '_',
+                (string) $voucher->status
+            )
         );
 
+        if (
+            $status !== 'unpaid'
+            || (float) ($voucher->paid_amount ?? 0) > 0
+            || $voucher->payments->isNotEmpty()
+        ) {
+            return redirect()
+                ->route('fee-vouchers.index')
+                ->with(
+                    'error',
+                    'Only unpaid vouchers with no recorded payments can be edited.'
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Request
+        |--------------------------------------------------------------------------
+        */
+
+        $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'period_from' => 'required|date',
+            'period_to' => 'required|date|after_or_equal:period_from',
+            'payable_amount' => 'required|numeric|min:0',
+            'due_date' => 'required|date',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Voucher and Items
+        |--------------------------------------------------------------------------
+        */
+
+        DB::transaction(function () use ($request, $voucher) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Lock Voucher and Recheck Payment History
+            |--------------------------------------------------------------------------
+            */
+
+            $lockedVoucher = FeeVoucher::whereKey($voucher->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedVoucher->load('payments');
+
+            $lockedStatus = strtolower(
+                str_replace(
+                    [' ', '-'],
+                    '_',
+                    (string) $lockedVoucher->status
+                )
+            );
+
+            if (
+                $lockedStatus !== 'unpaid'
+                || (float) ($lockedVoucher->paid_amount ?? 0) > 0
+                || $lockedVoucher->payments->isNotEmpty()
+            ) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'voucher' => 'This voucher can no longer be edited because its status or payment history has changed.',
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Voucher Details
+            |--------------------------------------------------------------------------
+            */
+
+            $updateData = [
+                'student_id' => $request->student_id,
+                'period_from' => $request->period_from,
+                'period_to' => $request->period_to,
+                'due_date' => $request->due_date,
+                'total_amount' => $request->total_amount,
+                'discount' => $request->discount ?? 0,
+                'payable_amount' => $request->payable_amount,
+                'amount_in_words' => $request->amount_in_words,
+                'notes' => $request->notes,
+            ];
+
+            $lockedVoucher->update($updateData);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Rebuild Voucher Items
+            |--------------------------------------------------------------------------
+            */
+
+            FeeVoucherItem::where(
+                'voucher_id',
+                $lockedVoucher->id
+            )->delete();
+
+            $feeTypeIds = $request->input('fee_type_id', []);
+
+            foreach ($feeTypeIds as $key => $feeTypeId) {
+
+                $monthValue = $request->input('month.' . $key);
+
+                if (
+                    $monthValue
+                    && strlen($monthValue) === 7
+                ) {
+                    $monthValue .= '-01';
+                }
+
+                FeeVoucherItem::create([
+                    'voucher_id' => $lockedVoucher->id,
+                    'fee_type_id' => $feeTypeId,
+                    'description' => $request->input(
+                        'description.' . $key
+                    ),
+                    'month' => $monthValue,
+                    'months_count' => $request->input(
+                        'months_count.' . $key,
+                        1
+                    ),
+                    'amount' => $request->input(
+                        'amount.' . $key
+                    ),
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Recalculate Balance and Status
+            |--------------------------------------------------------------------------
+            */
+
+            $lockedVoucher->recalculateBalance();
+        });
+
         return redirect()
-            ->route(
-                'fee-vouchers.index'
-            )
+            ->route('fee-vouchers.index')
             ->with(
                 'success',
                 'Fee voucher updated successfully.'
             );
     }
-
 
     /*
     |--------------------------------------------------------------------------

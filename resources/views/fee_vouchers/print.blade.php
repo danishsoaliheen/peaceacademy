@@ -53,6 +53,27 @@
             align-items: center;
             gap: 6px;
         }
+      
+      
+.btn-edit {
+    background: #198754;
+    color: #fff;
+    border: none;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-edit:hover {
+    background: #146c43;
+}
+
 
         /* ── Voucher wrapper ─────────────────────────── */
         .voucher {
@@ -279,16 +300,39 @@
     };
 @endphp
 
-{{-- ── Screen controls ── --}}
+{{-- Screen controls --}}
 <div class="screen-bar">
     <button class="btn-print" onclick="window.print()">
         Print / Save PDF
     </button>
-    <a href="{{ url()->previous() }}" class="btn-back">&larr; Back</a>
+
+    <a href="{{ url()->previous() }}" class="btn-back">
+        &larr; Back
+    </a>
+
+ 
+@php
+    $canEditVoucher =
+        auth()->check()
+        && auth()->user()->hasRole(['admin', 'accountant'])
+        && strtolower($voucher->status ?? 'unpaid') === 'unpaid'
+        && (float) ($voucher->paid_amount ?? 0) <= 0
+        && $payments->count() === 0;
+@endphp
+
+
+    @if($canEditVoucher)
+        <a href="{{ route('fee-vouchers.edit', $voucher->id) }}"
+           class="btn-edit">
+            Edit Voucher
+        </a>
+    @endif
+
     <span style="margin-left:auto;font-size:12px;color:#000;">
         Voucher: <strong>{{ $voucher->voucher_no ?? ('#' . $voucher->id) }}</strong>
     </span>
 </div>
+
 
 {{-- ── Voucher card ── --}}
 <div class="voucher">
@@ -304,7 +348,7 @@
 
     {{-- Status line --}}
     <div class="status-line">{{ $statusLabel }}</div>
-
+  
     <div class="v-body">
 
         {{-- Info grid --}}
