@@ -40,6 +40,7 @@
 
         .sidebar{
             width:260px;
+            min-height: 100vh;
             background:#1e293b;
             color:white;
             padding:20px 0;

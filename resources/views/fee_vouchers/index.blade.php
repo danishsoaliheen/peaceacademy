@@ -559,11 +559,88 @@
 
                         <!-- Payable Amount -->
 
-                        <td class="text-end">
+                        <!-- Paid Amount + Payment History -->
 
-                            {{ number_format($voucher->payable_amount,0) }}
+<td class="text-end">
 
-                        </td>
+    <!-- Total Paid Amount -->
+
+    <div class="amount-green"
+         style="font-size:16px; font-weight:bold;">
+
+        {{ number_format($voucher->paid_amount, 0) }}
+
+    </div>
+
+    <!-- Individual Payment Records -->
+
+    @if($voucher->payments->isNotEmpty())
+
+        <div style="
+            margin-top:8px;
+            text-align:left;
+            border-top:1px solid #ddd;
+            padding-top:6px;
+        ">
+
+            @foreach($voucher->payments as $payment)
+
+                <div style="
+                    margin-bottom:8px;
+                    padding-bottom:6px;
+                    border-bottom:1px dashed #ddd;
+                    font-size:11px;
+                ">
+
+                    <!-- Payment Amount -->
+
+                    <div style="
+                        color:#198754;
+                        font-weight:bold;
+                    ">
+
+                        Rs. {{ number_format($payment->amount_paid, 0) }}
+
+                    </div>
+
+                    <!-- Payment Date -->
+
+                    <div style="color:#495057;">
+
+                        <i class="fas fa-calendar-alt"></i>
+
+                        {{ $payment->payment_date
+                            ? \Carbon\Carbon::parse($payment->payment_date)->format('d-M-Y')
+                            : 'Date N/A'
+                        }}
+
+                    </div>
+
+                    <!-- Receipt Number -->
+
+                    <div style="color:#0d6efd;">
+    <i class="fas fa-receipt"></i>
+
+    @if($payment->receipt_no)
+        <a href="{{ url('/fee-payments/' . $payment->id . '/receipt') }}"
+           target="_blank"
+           style="color:#0d6efd; text-decoration:none; font-weight:bold;">
+            {{ $payment->receipt_no }}
+        </a>
+    @else
+        No Receipt No.
+    @endif
+</div>
+
+                </div>
+
+            @endforeach
+
+        </div>
+
+    @endif
+
+</td>
 
                         <!-- Paid Amount -->
 

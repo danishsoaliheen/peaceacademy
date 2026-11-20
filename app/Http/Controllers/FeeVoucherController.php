@@ -796,134 +796,67 @@ class FeeVoucherController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function edit($id)
-    {
-        /*
-        |--------------------------------------------------------------------------
-        | Authorization: Admin and Accountant Only
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !auth()->check()
-            || !auth()->user()->hasRole(['admin', 'accountant'])
-        ) {
-            abort(403, 'You are not authorized to edit fee vouchers.');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Load Voucher
-        |--------------------------------------------------------------------------
-        */
-
-        $voucher = FeeVoucher::with([
-            'items',
-            'student',
-            'payments',
-        ])->findOrFail($id);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Only Unpaid Vouchers Without Payments Can Be Edited
-        |--------------------------------------------------------------------------
-        */
-
-        $status = strtolower(
-            str_replace(
-                [' ', '-'],
-                '_',
-                (string) $voucher->status
-            )
-        );
-
-        if (
-            $status !== 'unpaid'
-            || (float) ($voucher->paid_amount ?? 0) > 0
-            || $voucher->payments->isNotEmpty()
-        ) {
-            return redirect()
-                ->route('fee-vouchers.index')
-                ->with(
-                    'error',
-                    'Only unpaid vouchers with no recorded payments can be edited.'
-                );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Payment Lock
-        |--------------------------------------------------------------------------
-        |
-        | The voucher has already passed the no-payment checks above.
-        |
-        */
-
-        $hasPayments = false;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Classes
-        |--------------------------------------------------------------------------
-        */
-
-        $classes = PaClass::orderBy('class_order')->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Students
-        |--------------------------------------------------------------------------
-        */
-
-        $students = Student::with('enrollments.class')
-            ->orderBy('student_name')
-            ->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Active Fee Types
-        |--------------------------------------------------------------------------
-        */
-
-        $feeTypes = FeeType::where('is_active', 1)->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Class Fee Map
-        |--------------------------------------------------------------------------
-        */
-
-        $classFeeMap = \App\Models\ClassFeeStructure::where(
-            'is_active',
-            1
-        )
-            ->get([
-                'class_id',
-                'fee_type_id',
-                'amount',
-            ])
-            ->groupBy('class_id')
-            ->map(
-                fn ($rows) => $rows->pluck(
-                    'amount',
-                    'fee_type_id'
-                )
-            )
-            ->toArray();
-
-        return view(
-            'fee_vouchers.edit',
-            compact(
-                'voucher',
-                'classes',
-                'students',
-                'feeTypes',
-                'classFeeMap',
-                'hasPayments'
-            )
-        );
+public function edit($id)
+{
+    if (
+        !auth()->check()
+        || !auth()->user()->hasRole(['admin', 'accountant'])
+    ) {
+        abort(403, 'You are not authorized to edit fee vouchers.');
     }
 
+    $voucher = FeeVoucher::with([
+        'items',
+        'student.enrollments.class',
+        'payments' => function ($paymentQuery) {
+            $paymentQuery
+                ->orderBy('created_at', 'asc')
+                ->orderBy('id', 'asc');
+        },
+    ])->findOrFail($id);
+
+    $status = strtolower(
+        str_replace([' ', '-'], '_', (string) $voucher->status)
+    );
+
+    if (
+        $status !== 'unpaid'
+        || (float) ($voucher->paid_amount ?? 0) > 0
+        || $voucher->payments->isNotEmpty()
+    ) {
+        return redirect()
+            ->route('fee-vouchers.index')
+            ->with(
+                'error',
+                'Only unpaid vouchers with no recorded payments can be edited.'
+            );
+    }
+
+    $hasPayments = false;
+    $classes = PaClass::orderBy('class_order')->get();
+    $students = Student::with('enrollments.class')
+        ->orderBy('student_name')
+        ->get();
+    $feeTypes = FeeType::where('is_active', 1)->get();
+
+    $classFeeMap = \App\Models\ClassFeeStructure::where('is_active', 1)
+        ->get(['class_id', 'fee_type_id', 'amount'])
+        ->groupBy('class_id')
+        ->map(fn ($rows) => $rows->pluck('amount', 'fee_type_id'))
+        ->toArray();
+
+    return view(
+        'fee_vouchers.edit',
+        compact(
+            'voucher',
+            'classes',
+            'students',
+            'feeTypes',
+            'classFeeMap',
+            'hasPayments'
+        )
+    );
+}
 
     /*
     |--------------------------------------------------------------------------
