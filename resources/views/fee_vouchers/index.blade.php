@@ -443,7 +443,7 @@
 @endphp
                     <tr class="{{ $rowClass }}">
 
-                        <!-- ID -->
+                        <!-- 1. ID -->
 
                         <td>
 
@@ -451,7 +451,7 @@
 
                         </td>
 
-                        <!-- Voucher No -->
+                        <!-- 2. Voucher No -->
 
                         <td>
 
@@ -459,198 +459,198 @@
 
                         </td>
 
+                        <!-- 3. Student -->
+
                         <td>
 
-    @if($voucher->student)
+                            @if($voucher->student)
 
-        <a href="{{ route('students.show', $voucher->student->id) }}"
-           style="color:#0d6efd;text-decoration:none;font-weight:600;">
+                                <a href="{{ route('students.show', $voucher->student->id) }}"
+                                   style="color:#0d6efd;text-decoration:none;font-weight:600;">
 
-            {{ strtoupper($voucher->student->student_name ?? '') }}
+                                    {{ strtoupper($voucher->student->student_name ?? '') }}
 
-        </a>
+                                </a>
 
-        @if(!$voucher->student->is_active)
+                                @if(!$voucher->student->is_active)
 
-            <span style="
-                font-size:10px;
-                color:#dc3545;
-                font-weight:bold;
-                margin-left:4px;
-            ">
-                (Inactive)
-            </span>
+                                    <span style="
+                                        font-size:10px;
+                                        color:#dc3545;
+                                        font-weight:bold;
+                                        margin-left:4px;
+                                    ">
+                                        (Inactive)
+                                    </span>
 
-        @endif
+                                @endif
 
-        @php
-            $studentClass = $voucher->student
-                ->activeEnrollment
-                ?->class
-                ?->class_name;
-        @endphp
+                                @php
+                                    $studentClass = $voucher->student
+                                        ->activeEnrollment
+                                        ?->class
+                                        ?->class_name;
+                                @endphp
 
-        @if($studentClass)
+                                @if($studentClass)
 
-            <br>
+                                    <br>
 
-            <span style="font-size:11px;color:#495057;">
+                                    <span style="font-size:11px;color:#495057;">
 
-                <i class="fas fa-school"></i>
+                                        <i class="fas fa-school"></i>
 
-                {{ $studentClass }}
+                                        {{ $studentClass }}
 
-            </span>
+                                    </span>
 
-        @endif
+                                @endif
 
-        @if(!empty($voucher->student->family_code))
+                                @if(!empty($voucher->student->family_code))
 
-            <br>
+                                    <br>
 
-            <a href="{{ route('students.index', [
-                'family_code' => $voucher->student->family_code
-            ]) }}"
-               style="
-                    font-size:11px;
-                    color:#6c757d;
-                    text-decoration:none;
-               "
-               title="View all students in this family">
+                                    <a href="{{ route('students.index', [
+                                        'family_code' => $voucher->student->family_code
+                                    ]) }}"
+                                       style="
+                                            font-size:11px;
+                                            color:#6c757d;
+                                            text-decoration:none;
+                                       "
+                                       title="View all students in this family">
 
-                <i class="fas fa-users"></i>
+                                        <i class="fas fa-users"></i>
 
-                {{ $voucher->student->family_code }}
+                                        {{ $voucher->student->family_code }}
 
-            </a>
+                                    </a>
 
-            @if(
-                isset($familyOutstanding[$voucher->student->family_code])
-                && $familyOutstanding[$voucher->student->family_code] > 0
-            )
+                                    @if(
+                                        isset($familyOutstanding[$voucher->student->family_code])
+                                        && $familyOutstanding[$voucher->student->family_code] > 0
+                                    )
 
-                <span style="
-                    font-size:11px;
-                    color:#dc3545;
-                    font-weight:bold;
-                ">
+                                        <span style="
+                                            font-size:11px;
+                                            color:#dc3545;
+                                            font-weight:bold;
+                                        ">
 
-                    &middot;
+                                            &middot;
 
-                    Due
-                    {{ number_format(
-                        $familyOutstanding[$voucher->student->family_code],
-                        0
-                    ) }}
+                                            Due
+                                            {{ number_format(
+                                                $familyOutstanding[$voucher->student->family_code],
+                                                0
+                                            ) }}
 
-                </span>
+                                        </span>
 
-            @endif
+                                    @endif
 
-        @endif
+                                @endif
 
-    @else
+                            @else
 
-        N/A
+                                N/A
 
-    @endif
-
-</td>
-
-                        <!-- Payable Amount -->
-
-                        <!-- Paid Amount + Payment History -->
-
-<td class="text-end">
-
-    <!-- Total Paid Amount -->
-
-    <div class="amount-green"
-         style="font-size:16px; font-weight:bold;">
-
-        {{ number_format($voucher->paid_amount, 0) }}
-
-    </div>
-
-    <!-- Individual Payment Records -->
-
-    @if($voucher->payments->isNotEmpty())
-
-        <div style="
-            margin-top:8px;
-            text-align:left;
-            border-top:1px solid #ddd;
-            padding-top:6px;
-        ">
-
-            @foreach($voucher->payments as $payment)
-
-                <div style="
-                    margin-bottom:8px;
-                    padding-bottom:6px;
-                    border-bottom:1px dashed #ddd;
-                    font-size:11px;
-                ">
-
-                    <!-- Payment Amount -->
-
-                    <div style="
-                        color:#198754;
-                        font-weight:bold;
-                    ">
-
-                        Rs. {{ number_format($payment->amount_paid, 0) }}
-
-                    </div>
-
-                    <!-- Payment Date -->
-
-                    <div style="color:#495057;">
-
-                        <i class="fas fa-calendar-alt"></i>
-
-                        {{ $payment->payment_date
-                            ? \Carbon\Carbon::parse($payment->payment_date)->format('d-M-Y')
-                            : 'Date N/A'
-                        }}
-
-                    </div>
-
-                    <!-- Receipt Number -->
-
-                    <div style="color:#0d6efd;">
-    <i class="fas fa-receipt"></i>
-
-    @if($payment->receipt_no)
-        <a href="{{ url('/fee-payments/' . $payment->id . '/receipt') }}"
-           target="_blank"
-           style="color:#0d6efd; text-decoration:none; font-weight:bold;">
-            {{ $payment->receipt_no }}
-        </a>
-    @else
-        No Receipt No.
-    @endif
-</div>
-
-                </div>
-
-            @endforeach
-
-        </div>
-
-    @endif
-
-</td>
-
-                        <!-- Paid Amount -->
-
-                        <td class="text-end amount-green">
-
-                            {{ number_format($voucher->paid_amount,0) }}
+                            @endif
 
                         </td>
 
-                        <!-- Balance -->
+                        <!-- 4. Payable Amount -->
+
+                        <td class="text-end" style="font-weight:bold;">
+
+                            {{ number_format($voucher->payable_amount, 0) }}
+
+                        </td>
+
+                        <!-- 5. Paid Amount + Payment History -->
+
+                        <td class="text-end">
+
+                            <!-- Total Paid Amount -->
+
+                            <div class="amount-green"
+                                 style="font-size:16px; font-weight:bold;">
+
+                                {{ number_format($voucher->paid_amount, 0) }}
+
+                            </div>
+
+                            <!-- Individual Payment Records -->
+
+                            @if($voucher->payments->isNotEmpty())
+
+                                <div style="
+                                    margin-top:8px;
+                                    text-align:left;
+                                    border-top:1px solid #ddd;
+                                    padding-top:6px;
+                                ">
+
+                                    @foreach($voucher->payments as $payment)
+
+                                        <div style="
+                                            margin-bottom:8px;
+                                            padding-bottom:6px;
+                                            border-bottom:1px dashed #ddd;
+                                            font-size:11px;
+                                        ">
+
+                                            <!-- Payment Amount -->
+
+                                            <div style="
+                                                color:#198754;
+                                                font-weight:bold;
+                                            ">
+
+                                                Rs. {{ number_format($payment->amount_paid, 0) }}
+
+                                            </div>
+
+                                            <!-- Payment Date -->
+
+                                            <div style="color:#495057;">
+
+                                                <i class="fas fa-calendar-alt"></i>
+
+                                                {{ $payment->payment_date
+                                                    ? \Carbon\Carbon::parse($payment->payment_date)->format('d-M-Y')
+                                                    : 'Date N/A'
+                                                }}
+
+                                            </div>
+
+                                            <!-- Receipt Number -->
+
+                                            <div style="color:#0d6efd;">
+                                                <i class="fas fa-receipt"></i>
+
+                                                @if($payment->receipt_no)
+                                                    <a href="{{ url('/fee-payments/' . $payment->id . '/receipt') }}"
+                                                       target="_blank"
+                                                       style="color:#0d6efd; text-decoration:none; font-weight:bold;">
+                                                        {{ $payment->receipt_no }}
+                                                    </a>
+                                                @else
+                                                    No Receipt No.
+                                                @endif
+                                            </div>
+
+                                        </div>
+
+                                    @endforeach
+
+                                </div>
+
+                            @endif
+
+                        </td>
+
+                        <!-- 6. Balance -->
 
                         <td class="text-end">
 
@@ -684,7 +684,7 @@
 
                         </td>
 
-                        <!-- Status -->
+                        <!-- 7. Status -->
 
                         <td>
 
@@ -696,7 +696,7 @@
 
                         </td>
 
-                        <!-- Due Date -->
+                        <!-- 8. Due Date -->
 
                         <td>
 
@@ -704,102 +704,101 @@
 
                         </td>
 
-                        <!-- Actions -->
+                        <!-- 9. Actions -->
 
-<td>
+                        <td>
 
-    <!-- Edit Voucher Button (unpaid / partial only) -->
-    @if($status == 'unpaid' || $status == 'partial')
+                            <!-- Edit Voucher Button (unpaid / partial only) -->
+                            @if($status == 'unpaid' || $status == 'partial')
 
-        <a href="{{ route('fee-vouchers.edit', $voucher->id) }}"
-           class="btn btn-primary">
+                                <a href="{{ route('fee-vouchers.edit', $voucher->id) }}"
+                                   class="btn btn-primary">
 
-            Edit
+                                    Edit
 
-        </a>
+                                </a>
 
-    @endif
+                            @endif
 
-    <!-- Fix Payment Method (paid vouchers only) -->
-    @if($status == 'paid')
-        @php $latestPayment = $voucher->payments->sortByDesc('id')->first(); @endphp
-        @if($latestPayment)
-        <a href="{{ route('fee-payments.edit', $latestPayment->id) }}"
-           class="btn"
-           style="background:#7c3aed;color:#fff;"
-           title="Correct payment method on this paid voucher">
-            <i class="fas fa-pen-to-square"></i> Fix Method
-        </a>
-        @endif
-    @endif
+                            <!-- Fix Payment Method (paid vouchers only) -->
+                            @if($status == 'paid')
+                                @php $latestPayment = $voucher->payments->sortByDesc('id')->first(); @endphp
+                                @if($latestPayment)
+                                <a href="{{ route('fee-payments.edit', $latestPayment->id) }}"
+                                   class="btn"
+                                   style="background:#7c3aed;color:#fff;"
+                                   title="Correct payment method on this paid voucher">
+                                    <i class="fas fa-pen-to-square"></i> Fix Method
+                                </a>
+                                @endif
+                            @endif
 
-    <!-- Receive Payment Button -->
+                            <!-- Receive Payment Button -->
 
-    <a href="{{ route('fee-payments.create', $voucher->id) }}"
-       class="btn btn-success">
+                            <a href="{{ route('fee-payments.create', $voucher->id) }}"
+                               class="btn btn-success">
 
-        Receive
+                                Receive
 
-    </a>
+                            </a>
 
+                            <!-- Print Button -->
 
-<!-- Print Button -->
+                            <a href="{{ route('fee-vouchers.print', $voucher->id) }}"
+                               target="_blank"
+                               class="btn btn-dark">
 
-<a href="{{ route('fee-vouchers.print', $voucher->id) }}"
-   target="_blank"
-   class="btn btn-dark">
+                                Print
 
-    Print
+                            </a>
 
-</a>
+                            <!-- Save PDF Button -->
 
+                            <form method="POST"
+                                  action="{{ route('fee-vouchers.save-pdf', $voucher->id) }}"
+                                  style="display:inline;">
 
-<!-- Save PDF Button -->
+                                @csrf
 
-<form method="POST"
-      action="{{ route('fee-vouchers.save-pdf', $voucher->id) }}"
-      style="display:inline;">
+                                <button type="submit"
+                                        class="btn"
+                                        style="background:#6f42c1;color:#fff;"
+                                        title="Generate and save this voucher as PDF">
 
-    @csrf
+                                    <i class="fas fa-file-pdf"></i> Save PDF
 
-    <button type="submit"
-            class="btn"
-            style="background:#6f42c1;color:#fff;"
-            title="Generate and save this voucher as PDF">
+                                </button>
 
-        <i class="fas fa-file-pdf"></i> Save PDF
+                            </form>
 
-    </button>
+                            <a href="{{ route('fee-vouchers.whatsapp', $voucher->id) }}"
+                               class="btn"
+                               style="background:#25D366;color:#fff;"
+                               title="Send voucher through WhatsApp">
+                                <i class="fab fa-whatsapp"></i> WhatsApp
+                            </a>
 
-</form>
+                            <!-- Delete Button (only when no payment has ever been recorded) -->
 
-<a href="{{ route('fee-vouchers.whatsapp', $voucher->id) }}"
-   class="btn"
-   style="background:#25D366;color:#fff;"
-   title="Send voucher through WhatsApp">
-    <i class="fab fa-whatsapp"></i> WhatsApp
-</a>
+                            @if($voucher->payments->count() === 0)
 
-    <!-- Delete Button (only when no payment has ever been recorded) -->
+                                <form method="POST"
+                                      action="{{ route('fee-vouchers.destroy', $voucher->id) }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Delete voucher {{ $voucher->voucher_no }}? This cannot be undone.')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="btn"
+                                            style="background:#dc3545;">
+                                        Delete
+                                    </button>
+                                </form>
 
-    @if($voucher->payments->count() === 0)
+                            @endif
 
-        <form method="POST"
-              action="{{ route('fee-vouchers.destroy', $voucher->id) }}"
-              style="display:inline;"
-              onsubmit="return confirm('Delete voucher {{ $voucher->voucher_no }}? This cannot be undone.')">
-            @csrf
-            @method('DELETE')
-            <button type="submit"
-                    class="btn"
-                    style="background:#dc3545;">
-                Delete
-            </button>
-        </form>
+                        </td>
 
-    @endif
-
-</td>
                     </tr>
 
                 @empty
